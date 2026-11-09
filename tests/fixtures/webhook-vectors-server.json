@@ -1,0 +1,19 @@
+{
+  "source": "Captured from the Scriptivox API's own webhook sender on 2026-11-09 (fetch intercepted, nothing sent); the secret is a random throwaway.",
+  "vectors": [
+    {
+      "secret": "whsec_cfc55bd5ba8da1c75b4ecfee1e19c31d2d6ef860de04862dd08145c09cc27ab8",
+      "timestamp": "1794252510",
+      "body": "{\"event\":\"transcription.completed\",\"transcription_id\":\"9d0c2f8e-1111-4222-8333-444455556666\",\"status\":\"completed\",\"duration_seconds\":7,\"cost_cents\":0.0292,\"result\":{\"full_transcript\":\"Grüße aus Köln — 日本語 ✓\",\"language\":\"de\",\"duration_seconds\":7,\"speakers\":null,\"utterances\":[]}}",
+      "signature": "49149136985acd0c14bf794b52b397602444bf6f2725bdb336d771f1a96ffa82",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Scriptivox-Signature": "49149136985acd0c14bf794b52b397602444bf6f2725bdb336d771f1a96ffa82",
+        "X-Scriptivox-Timestamp": "1794252510",
+        "X-Scriptivox-Delivery": "0f1e2d3c-4b5a-4697-8877-665544332211",
+        "X-Scriptivox-Attempt": "1",
+        "User-Agent": "scriptivox-webhook/1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "source": "python hmac (independent of the SDK)",
+  "vectors": [
+    {
+      "secret": "whsec_3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+      "timestamp": "1762714800",
+      "body": "{\"event\":\"transcription.completed\",\"transcription_id\":\"5b3c3652-0000-4000-8000-000000000001\",\"status\":\"completed\",\"duration_seconds\":11,\"cost_cents\":0.0458,\"result\":{\"full_transcript\":\"Héllo — wörld ✓\",\"language\":\"en\",\"utterances\":[]}}",
+      "signature": "12adf99c92b2d2727c7119cc1f0ba9f303dcb458f9d5427258b38036bb3b8a33"
+    }
+  ]
+}

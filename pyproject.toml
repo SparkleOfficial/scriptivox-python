@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scriptivox"
+dynamic = ["version"]
+description = "Official Python SDK for the Scriptivox transcription API: upload, transcribe, wait, export SRT/VTT/text, list, and verify webhooks."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [{ name = "Scriptivox", email = "support@scriptivox.com" }]
+keywords = ["scriptivox", "transcription", "speech-to-text", "asr", "subtitles", "srt", "vtt", "diarization", "sdk", "api"]
+dependencies = ["httpx>=0.23,<1"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://www.scriptivox.com"
+Documentation = "https://platform.scriptivox.com/docs/quickstart"
+Repository = "https://github.com/SparkleOfficial/scriptivox-python"
+Issues = "https://github.com/SparkleOfficial/scriptivox-python/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.hatch.version]
+path = "src/scriptivox/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scriptivox"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/scriptivox", "tests", "scripts", "openapi", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
