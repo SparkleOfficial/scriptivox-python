@@ -3540,7 +3540,7 @@
           "Feedback"
         ],
         "summary": "Rate a job or report a problem with it",
-        "description": "Sends feedback on one of your transcriptions to the Scriptivox team: a rating from 1 to 5 on a completed job (with optional topics and a comment), a problem report (`problem: true` with `what_happened`) on any job, or both in one call. A second rating of the same job replaces the first. A rating of 1 or 2 that comes with a comment or `their_words` also opens a problem report. Every reported problem is resolved within 24 hours, and the reply goes to your account's email. At most 5 new problem reports a day per account; a report on a job whose report is still open is added to it.",
+        "description": "Sends feedback on one of your transcriptions to the Scriptivox team: a rating from 1 to 5 on a completed job, a problem report (`problem: true` with `what_happened`) on any job, or both in one call. Every feedback needs words, at least 20 characters: a rating needs `comment` or `their_words`, a problem report `what_happened` or `their_words`. Topics are optional. A second rating of the same job replaces the first. A rating of 1 or 2 also opens a problem report. Every reported problem is resolved within 24 hours, and the reply goes to your account's email. At most 5 new problem reports a day per account; a report on a job whose report is still open is added to it. If a kind of feedback is switched off, what you send is kept as the nearest kind that is on: `rating_saved` is false, `saved_as` names the kind it was kept as, and `notice` says so.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -3580,7 +3580,7 @@
         },
         "responses": {
           "200": {
-            "description": "Saved. `problem_report` is set when a problem report was opened or added to.",
+            "description": "Saved. `problem_report` is set when a problem report was opened or added to. `saved_as` and `notice` are set when the kind you sent is switched off and it was kept as another kind.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -3642,7 +3642,7 @@
             }
           },
           "400": {
-            "description": "No rating and no problem, a rating outside 1 to 5, a problem without what_happened, or a field of the wrong type (INVALID_REQUEST).",
+            "description": "No rating and no problem; a rating without words (comment or their_words, at least 20 characters); a problem without what_happened or with fewer than 20 characters of words; a rating outside 1 to 5; or a field of the wrong type (INVALID_REQUEST).",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -3870,7 +3870,7 @@
             }
           },
           "409": {
-            "description": "A rating on a job that has not completed: send a problem report instead (CONFLICT).",
+            "description": "A rating on a job that has not completed: send a problem report instead; or this kind of feedback is switched off and no other kind can keep it (CONFLICT).",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -6406,7 +6406,7 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 5,
-            "description": "How good the transcript is, 1 (poor) to 5 (excellent). Completed jobs only."
+            "description": "How good the transcript is, 1 (poor) to 5 (excellent). Completed jobs only. Needs comment or their_words, at least 20 characters."
           },
           "topics": {
             "type": "array",
@@ -6414,6 +6414,7 @@
               "type": "string",
               "enum": [
                 "accuracy",
+                "clarity",
                 "speakers",
                 "timing",
                 "language",
@@ -6421,18 +6422,18 @@
                 "other"
               ]
             },
-            "maxItems": 6,
-            "description": "What the rating is about."
+            "maxItems": 7,
+            "description": "Optional: what the feedback is about."
           },
           "comment": {
             "type": "string",
-            "maxLength": 500,
-            "description": "A short comment on the transcript."
+            "maxLength": 1000,
+            "description": "What made it that rating, in words. With a rating: comment or their_words, at least 20 characters."
           },
           "their_words": {
             "type": "string",
             "maxLength": 1000,
-            "description": "Your end user's own words, unchanged, if you have them."
+            "description": "Your end user's own words, unchanged, if you have them. Counts as the words for a rating or a problem report."
           },
           "problem": {
             "type": "boolean",
@@ -6441,7 +6442,7 @@
           "what_happened": {
             "type": "string",
             "maxLength": 1000,
-            "description": "What went wrong, for a problem report."
+            "description": "What went wrong, for a problem report: what_happened or their_words, at least 20 characters."
           }
         }
       },
@@ -6461,7 +6462,20 @@
           },
           "rating_saved": {
             "type": "boolean",
-            "description": "True when a rating was sent and saved."
+            "description": "True when a rating was sent and saved as a rating. False when ratings are switched off (see saved_as)."
+          },
+          "saved_as": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "comment",
+              "question"
+            ],
+            "description": "Set when the kind you sent is switched off: the kind it was kept as instead (a rating of 1 or 2 becomes a problem report)."
+          },
+          "notice": {
+            "type": "string",
+            "description": "Set with saved_as: what was switched off and how your feedback was kept."
           },
           "problem_report": {
             "type": [
@@ -6487,7 +6501,7 @@
               },
               "added_to_open_report": {
                 "type": "boolean",
-                "description": "True when this was added to a report on the same job that is still open."
+                "description": "True when this was added to an earlier report on the same job: one still open, or one the team had resolved, which opens again."
               },
               "opened_by_rating": {
                 "type": "boolean",
