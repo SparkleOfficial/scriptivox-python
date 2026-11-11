@@ -4,7 +4,7 @@
     "title": "Scriptivox Transcription API",
     "version": "1.0.0",
     "summary": "Transcribe recorded audio and video into text with word-level timestamps and speaker labels.",
-    "description": "The Scriptivox API turns recorded audio and video into text. Submit a file by public URL or by\npresigned upload, poll for the result or receive a webhook, and read back a structured transcript\nwith per-utterance and per-word timestamps, optional speaker diarization, and SRT/WebVTT/plain-text\nexports.\n\n**When to use it.** Batch or on-demand transcription of *recorded* media: meeting and interview\nrecordings, podcasts, lecture capture, call archives, video libraries that need captions, and\npipelines that need word-level timestamps for clip search. 119 languages. It is not a live\nstreaming or real-time dictation API — every job takes a complete file.\n\n**Shape of an integration.** `POST /v1/transcribe` returns immediately with `status: \"created\"`;\nthe file is downloaded and validated in the background, so input errors surface later on\n`GET /v1/transcribe/{id}` with `status: \"failed\"`, not on the submit call. A correct client must\nhandle failures on the poll path.\n\n**Limits.** 5 GB per file, 1 second to 10 hours of audio, 26 accepted file formats. Source\naudio is deleted 24 hours after the job ends; transcripts stay retrievable.\n\n**Billing.** $0.20 per hour of audio, pay as you go. Cost is reserved once the duration is known\n(after download or validation), not at submit time. Failed and cancelled jobs are free — the\nreservation is released.\n\n**Errors.** Every error response is `{\"error\": {\"code\", \"message\"}}` with a machine-readable code.\nSee https://platform.scriptivox.com/docs/api-reference#error-codes.\n\n**Support.** Email support@scriptivox.com with the account email, the job id, when it happened\n(with time zone) and the exact error code and message; never an API key. Any feedback or issue\nsent to support, by email or any other channel, is resolved within 24 hours. This is our founders'\npersonal guarantee.",
+    "description": "The Scriptivox API turns recorded audio and video into text. Submit a file by public URL (a file,\na Google Drive, Dropbox and OneDrive share link, or a TikTok, Instagram, Facebook, X or Snapchat post) or by\npresigned upload, poll for the result or receive a webhook, and read back a structured transcript\nwith per-utterance and per-word timestamps, optional speaker diarization, and SRT/WebVTT/plain-text\nexports.\n\n**When to use it.** Batch or on-demand transcription of *recorded* media: meeting and interview\nrecordings, podcasts, lecture capture, call archives, video libraries that need captions, and\npipelines that need word-level timestamps for clip search. 119 languages. It is not a live\nstreaming or real-time dictation API — every job takes a complete file.\n\n**Shape of an integration.** `POST /v1/transcribe` returns immediately with `status: \"created\"`;\nthe file is downloaded and validated in the background, so input errors surface later on\n`GET /v1/transcribe/{id}` with `status: \"failed\"`, not on the submit call. A correct client must\nhandle failures on the poll path. The one exception is a social post link: it is checked on the\nsubmit call (a few seconds), and a post that cannot be transcribed is refused there with a 400.\n\n**Limits.** 5 GB per file, 1 second to 10 hours of audio, 26 accepted file formats. Source\naudio is deleted 24 hours after the job ends; transcripts stay retrievable.\n\n**Billing.** $0.20 per hour of audio, pay as you go. Cost is reserved once the duration is known\n(after download or validation), not at submit time. Failed and cancelled jobs are free — the\nreservation is released.\n\n**Errors.** Every error response is `{\"error\": {\"code\", \"message\"}}` with a machine-readable code.\nSee https://platform.scriptivox.com/docs/api-reference#error-codes.\n\n**Support.** Email support@scriptivox.com with the account email, the job id, when it happened\n(with time zone) and the exact error code and message; never an API key. Any feedback or issue\nsent to support, by email or any other channel, is resolved within 24 hours. This is our founders'\npersonal guarantee.",
     "termsOfService": "https://www.scriptivox.com/termsofuse",
     "contact": {
       "name": "Scriptivox API support",
@@ -886,7 +886,7 @@
           "Transcriptions"
         ],
         "summary": "Start a transcription",
-        "description": "Accepts a job and returns immediately with status \"created\". Supply exactly one of `url` (we download the file) or `upload_id` (from POST /v1/upload). Download and validation happen in the background, so input problems surface on GET /v1/transcribe/{id} with status \"failed\" — not here. Duration and cost are determined after download or validation. Requires a non-zero balance: returns 402 ZERO_BALANCE at $0.",
+        "description": "Accepts a job and returns immediately with status \"created\". Supply exactly one of `url` (we download the file) or `upload_id` (from POST /v1/upload). Download and validation happen in the background, so input problems surface on GET /v1/transcribe/{id} with status \"failed\" — not here. The exception is a link to a TikTok, Instagram, Facebook, X or Snapchat post: it is checked before the job is created (this call then takes a few seconds), and a post that can't be transcribed (private, deleted, no video) is refused here with 400 URL_NOT_ACCESSIBLE, `error.reason` and `error.platform`, with nothing created or charged. Duration and cost are determined after download or validation. Requires a non-zero balance: returns 402 ZERO_BALANCE at $0.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -917,11 +917,18 @@
               },
               "examples": {
                 "fromUrl": {
-                  "summary": "From a public URL",
+                  "summary": "From a public URL: a file, or a Google Drive, Dropbox and OneDrive share link",
                   "value": {
                     "url": "https://example.com/podcast-episode.mp3",
                     "language": "en",
                     "diarize": true
+                  }
+                },
+                "fromSocialPost": {
+                  "summary": "From a public TikTok, Instagram, Facebook, X or Snapchat post",
+                  "value": {
+                    "url": "https://www.instagram.com/reel/C0nT3stR33l/",
+                    "language": "en"
                   }
                 },
                 "fromUpload": {
@@ -996,7 +1003,7 @@
             }
           },
           "400": {
-            "description": "Invalid body (INVALID_REQUEST), unsupported media (INVALID_MEDIA_FORMAT), or an upload that was never completed, already consumed, or expired (FILE_NOT_UPLOADED, UPLOAD_ALREADY_USED, UPLOAD_EXPIRED, FILE_TOO_LARGE). Unknown top-level fields are rejected rather than ignored.",
+            "description": "Invalid body (INVALID_REQUEST), unsupported media (INVALID_MEDIA_FORMAT), or an upload that was never completed, already consumed, or expired (FILE_NOT_UPLOADED, UPLOAD_ALREADY_USED, UPLOAD_EXPIRED, FILE_TOO_LARGE). Unknown top-level fields are rejected rather than ignored. For a TikTok, Instagram, Facebook, X or Snapchat post that can't be transcribed: URL_NOT_ACCESSIBLE with `error.reason` link_not_verifiable, link_not_found, link_unsupported or link_no_media and `error.platform`, or DURATION_TOO_LONG when its video is longer than 10 hours. A link to a site whose links cannot be transcribed right now: INVALID_REQUEST with `error.reason` platform_disabled. In each case nothing is created or charged, and the `message` says why in plain words.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -1452,7 +1459,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded (RATE_LIMIT_EXCEEDED). Limits use a sliding 60-second window, per API key per endpoint, plus a 300/min per-IP cap across all endpoints. `Retry-After` and `RateLimit-Policy` are always present; `RateLimit` and `X-RateLimit-Remaining` are present when the per-key limiter is what rejected the request, and absent when the per-IP cap or an abuse block rejected it before the key was read.",
+            "description": "Rate limit exceeded (RATE_LIMIT_EXCEEDED). Limits use a sliding 60-second window, per API key per endpoint, plus a 300/min per-IP cap across all endpoints. `Retry-After` and `RateLimit-Policy` are always present; `RateLimit` and `X-RateLimit-Remaining` are present when the per-key limiter is what rejected the request, and absent when the per-IP cap or an abuse block rejected it before the key was read. Also RATE_LIMIT_EXCEEDED: 25 jobs already in progress on this account (`error.in_flight` and `error.limit`; wait for some to finish); or, for a social post link, a limit on social links set on your account (`error.reason` social_link_limit, `error.limit`, `error.window_seconds`, and the `Retry-After` header; accounts have none unless Scriptivox sets one), which uploads and other links do not count toward. Neither has `retry_after` in the body.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -1557,6 +1564,74 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A social post link could not be checked right now (LINK_CHECK_UNAVAILABLE): `error.reason` verify_rate_limited when link checks are busy (`Retry-After: 600`), link_check_failed when the check did not answer (`Retry-After: 60`). Or the API is briefly paused for maintenance (MAINTENANCE). Nothing was created or charged; send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "RateLimit": {
+                "description": "Remaining quota for this API key on this endpoint, as an RFC 9651 structured field. `r` is the remaining request count, `t` the seconds until the window resets. Only sent once the API key has been validated.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";r=57;t=41"
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests remaining in the current rolling 60-second window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp (seconds) at which the window fully resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "LINK_CHECK_UNAVAILABLE",
+                    "message": "Link checks are busy right now. Please wait a few minutes and try again.",
+                    "reason": "verify_rate_limited",
+                    "platform": "instagram",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
                 }
               }
             }
@@ -5551,6 +5626,8 @@
                   "FILE_TOO_LARGE",
                   "UPLOAD_ALREADY_USED",
                   "UPLOAD_EXPIRED",
+                  "URL_NOT_ACCESSIBLE",
+                  "DURATION_TOO_LONG",
                   "INVALID_API_KEY",
                   "API_KEY_REVOKED",
                   "INSUFFICIENT_BALANCE",
@@ -5567,19 +5644,22 @@
                   "IDEMPOTENCY_KEY_CONFLICT",
                   "RATE_LIMIT_EXCEEDED",
                   "INTERNAL_ERROR",
+                  "LINK_CHECK_UNAVAILABLE",
                   "MAINTENANCE",
                   "ENDPOINT_REMOVED",
                   "ISSUER_UNCONFIGURED"
                 ],
                 "description": "Machine-readable error code.",
                 "x-enumDescriptions": {
-                  "INVALID_REQUEST": "Malformed request body or missing required fields",
+                  "INVALID_REQUEST": "Malformed request body or missing required fields. Also returned at once for a link to a site whose links cannot be transcribed right now (`error.reason` `platform_disabled`, `error.platform` names the site); the `message` says what to send instead.",
                   "INVALID_FILENAME": "Filename is missing, too long, contains invalid characters, or has no extension",
                   "INVALID_MEDIA_FORMAT": "Unsupported file extension at upload time (e.g. `.txt`, `.pdf`). Also returned later if the contents turn out not to be readable audio or video.",
                   "FILE_NOT_UPLOADED": "File not found at the upload URL",
                   "FILE_TOO_LARGE": "File exceeds 5 GB limit",
                   "UPLOAD_ALREADY_USED": "Upload already used for a transcription",
                   "UPLOAD_EXPIRED": "Upload URL expired (1 hour TTL)",
+                  "URL_NOT_ACCESSIBLE": "A TikTok, Instagram, Facebook, X or Snapchat post that can't be transcribed, refused when you send it: nothing is created or charged. `error.reason` says why: `link_not_verifiable` (private, deleted or not available in the region), `link_not_found` (the video can't be opened), `link_unsupported` (a kind of link that is not a video, such as a Facebook Page or profile), `link_no_media` (no audio or video, such as a photo post); `error.platform` names the site. Sending the same link again gives the same answer. Other links that can't be downloaded fail later on `GET /v1/transcribe/{id}`.",
+                  "DURATION_TOO_LONG": "A social post whose video is longer than 10 hours, refused when you send it (`error.platform` names the site). Nothing is created or charged.",
                   "INVALID_API_KEY": "Invalid or missing API key",
                   "API_KEY_REVOKED": "API key has been revoked",
                   "INSUFFICIENT_BALANCE": "Not enough balance for this transcription",
@@ -5594,8 +5674,9 @@
                   "UNSUPPORTED_MEDIA_TYPE": "Request body sent without `Content-Type: application/json` on a POST/PUT/PATCH. The response includes an `Accept-Post: application/json` header. Parameters are allowed (`application/json; charset=utf-8` works).",
                   "IDEMPOTENCY_KEY_LOCKED": "Another request with the same `Idempotency-Key` is mid-flight. Retry after a few seconds (`Retry-After` header sent).",
                   "IDEMPOTENCY_KEY_CONFLICT": "`Idempotency-Key` reused with a different request body. Use a fresh key for a different operation.",
-                  "RATE_LIMIT_EXCEEDED": "Too many requests (see Rate Limits), or 25 jobs already in progress on POST /v1/transcribe",
+                  "RATE_LIMIT_EXCEEDED": "Too many requests (see Rate Limits), or 25 jobs already in progress on POST /v1/transcribe. On POST /v1/transcribe with a social post link, also a limit on social links set on your account (`error.reason` `social_link_limit`, with `error.limit` and `error.window_seconds`; accounts have none unless Scriptivox sets one); uploads and other links are not affected. Wait the seconds in the `Retry-After` header.",
                   "INTERNAL_ERROR": "Server error",
+                  "LINK_CHECK_UNAVAILABLE": "A social post link could not be checked right now, so nothing was created or charged. `error.reason` `verify_rate_limited`: link checks are busy (`Retry-After: 600`); `link_check_failed`: the check did not answer (`Retry-After: 60`). Send the same request again after that many seconds. Links to files and to Google Drive, Dropbox or OneDrive are not checked and are not affected.",
                   "MAINTENANCE": "The API is briefly paused for maintenance. Nothing was created or charged. Retry after the number of seconds in the `Retry-After` header.",
                   "ENDPOINT_REMOVED": "This endpoint has been removed. The `message` says what to use instead (for `POST /v1/accounts`: create the account at https://www.scriptivox.com/signup).",
                   "ISSUER_UNCONFIGURED": "OAuth sign-in is not configured on this deployment."
@@ -5608,6 +5689,8 @@
                   "FILE_TOO_LARGE": 400,
                   "UPLOAD_ALREADY_USED": 400,
                   "UPLOAD_EXPIRED": 400,
+                  "URL_NOT_ACCESSIBLE": 400,
+                  "DURATION_TOO_LONG": 400,
                   "INVALID_API_KEY": 401,
                   "API_KEY_REVOKED": 401,
                   "INSUFFICIENT_BALANCE": 402,
@@ -5624,6 +5707,7 @@
                   "IDEMPOTENCY_KEY_CONFLICT": 422,
                   "RATE_LIMIT_EXCEEDED": 429,
                   "INTERNAL_ERROR": 500,
+                  "LINK_CHECK_UNAVAILABLE": 503,
                   "MAINTENANCE": 503,
                   "ENDPOINT_REMOVED": 410,
                   "ISSUER_UNCONFIGURED": 503
@@ -5642,12 +5726,41 @@
                 "type": "string",
                 "pattern": "^req_[0-9a-f]{16}$",
                 "description": "The id of this request, the same value as the `X-Request-Id` response header. Include it when you contact support."
+              },
+              "reason": {
+                "type": "string",
+                "description": "Why a link was refused on POST /v1/transcribe, when the code alone does not say: link_not_verifiable, link_not_found, link_unsupported, link_no_media (URL_NOT_ACCESSIBLE), platform_disabled (INVALID_REQUEST), social_link_limit (RATE_LIMIT_EXCEEDED), verify_rate_limited or link_check_failed (LINK_CHECK_UNAVAILABLE). New values may be added.",
+                "example": "link_not_verifiable"
+              },
+              "platform": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The site of a refused social post link, in lower case (e.g. \"instagram\", \"tiktok\", \"facebook\", \"x\").",
+                "example": "instagram"
+              },
+              "limit": {
+                "type": "integer",
+                "description": "On a 429 RATE_LIMIT_EXCEEDED from POST /v1/transcribe: with reason social_link_limit, how many social links the account may send in `window_seconds`; otherwise the most jobs the account may have in progress at once."
+              },
+              "window_seconds": {
+                "type": "integer",
+                "enum": [
+                  600,
+                  86400
+                ],
+                "description": "With reason social_link_limit: the window of that limit, in seconds (10 minutes or 24 hours)."
+              },
+              "in_flight": {
+                "type": "integer",
+                "description": "On a 429 RATE_LIMIT_EXCEEDED for jobs in progress: how many of your jobs are in progress now."
               }
             }
           },
           "retry_after": {
             "type": "integer",
-            "description": "Seconds to wait before retrying. Present on 429 responses alongside the Retry-After header."
+            "description": "Seconds to wait before retrying. Present on the gateway's own 429 responses alongside the Retry-After header. Not on a 429 from POST /v1/transcribe for jobs in progress or a social-link limit, nor on a 503."
           }
         },
         "example": {
@@ -5729,7 +5842,7 @@
             "type": "string",
             "format": "uri",
             "maxLength": 2048,
-            "description": "Anonymously accessible http or https URL. An anonymous GET must return the raw file bytes, not an HTML preview, login form or password page. Direct and presigned URLs (S3, GCS, Azure SAS) always work. Share links work only when set to \"anyone with the link can view\": Google Drive, Dropbox files (not /scl/fo/ folder links), and OneDrive personal /redir or onedrive.live.com links. OneDrive 1drv.ms/v/c/ and /p/c/ photo shares cannot be used — Microsoft routes them through SharePoint Photos, which requires sign-in.",
+            "description": "Anonymously accessible http or https URL. An anonymous GET must return the raw file bytes, not an HTML preview, login form or password page. Direct and presigned URLs (S3, GCS, Azure SAS) always work. Share links work only when set to \"anyone with the link can view\": Google Drive, Dropbox files (not /scl/fo/ folder links), and OneDrive personal /redir or onedrive.live.com links. OneDrive 1drv.ms/v/c/ and /p/c/ photo shares cannot be used — Microsoft routes them through SharePoint Photos, which requires sign-in. A public post on TikTok, Instagram, Facebook, X and Snapchat also works: send the post's own link (a video or a reel). It is checked when you send it, and a post that is private, deleted or has no video is refused at once with 400 URL_NOT_ACCESSIBLE (see `error.reason`), with nothing created or charged.",
             "example": "https://example.com/podcast-episode.mp3"
           },
           "language": {
@@ -5918,7 +6031,7 @@
             ],
             "description": "Stable machine-readable reason the job failed. Branch on this, never on message.",
             "x-enumDescriptions": {
-              "URL_NOT_ACCESSIBLE": "URL flow only. Covers several non-fetchable cases: the URL returned 4xx/5xx; DNS didn't resolve; the connection was refused; the response was an HTML page instead of media (login/preview/folder/expired-link); the share requires sign-in (e.g. OneDrive `1drv.ms/v/c/…` SharePoint Photos shares); or the server returned a 200 with an empty body. The `message` field names the specific cause when detectable.",
+              "URL_NOT_ACCESSIBLE": "URL flow only. Covers several non-fetchable cases: the URL returned 4xx/5xx; DNS didn't resolve; the connection was refused; the response was an HTML page instead of media (login/preview/folder/expired-link, or a video site's page instead of its video); the share requires sign-in (e.g. OneDrive `1drv.ms/v/c/…` SharePoint Photos shares); or the server returned a 200 with an empty body. For a social post that passed the check: its video file could not be downloaded, or the download links the site gave expired before the download and checking the post again did not give working ones. The `message` field names the specific cause when detectable.",
               "DOWNLOAD_FAILED": "URL flow only: the download started but was interrupted.",
               "INVALID_MEDIA_FORMAT": "The file downloaded but could not be read: not actually audio/video, no audio track, or **shorter than the 1-second minimum** (message names the measured duration, e.g. `\"Audio too short (0.10s). Minimum duration is 1 second.\"`).",
               "FILE_TOO_LARGE": "The file is larger than 5 GB. For a URL this is only known once the download reaches the limit.",

@@ -251,6 +251,8 @@ class Scriptivox:
     ) -> TranscriptionCreated:
         """Start a transcription from a public ``url``, a local ``file`` (uploaded first) or an earlier
         ``upload_id``. Returns as soon as the job is accepted (status "created"); call wait(id) next.
+        A ``url`` can be a file, a Google Drive, Dropbox or OneDrive share link, or a public TikTok,
+        Instagram, Facebook, X or Snapchat post; a post that can't be transcribed raises UrlNotAccessibleError here.
 
         Every call sends an Idempotency-Key (a new UUID unless you pass one), so the SDK's own retries
         never create a second billable job. Omit ``language`` to auto-detect.

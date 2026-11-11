@@ -18,9 +18,11 @@ from scriptivox import (
     APIError,
     APITimeoutError,
     AuthenticationError,
+    BadRequestError,
     InternalError,
     InvalidApiKeyError,
     InvalidRequestError,
+    LinkCheckUnavailableError,
     MaintenanceError,
     NotFoundError,
     PayloadTooLargeError,
@@ -33,6 +35,7 @@ from scriptivox import (
     TranscriptionFailedError,
     TranscriptionNotFoundError,
     UploadFailedError,
+    UrlNotAccessibleError,
     WaitTimeoutError,
     ZeroBalanceError,
     safe_filename,
@@ -116,6 +119,33 @@ def test_long_retry_after_is_not_waited(mock):
     assert len(mock.requests) == 1
 
 
+def test_social_post_refused_at_once(mock):
+    mock.reply(api_error(400, "URL_NOT_ACCESSIBLE", "This link could not be checked. It may be private, deleted or not available in your region.", reason="link_not_verifiable", platform="instagram"))
+    with pytest.raises(UrlNotAccessibleError) as e:
+        mock.client().transcribe(url="https://www.instagram.com/p/C0nT3stPr1v/")
+    assert isinstance(e.value, BadRequestError)
+    assert e.value.code == "URL_NOT_ACCESSIBLE"
+    assert e.value.error["reason"] == "link_not_verifiable" and e.value.error["platform"] == "instagram"
+    assert len(mock.requests) == 1
+
+
+def test_link_check_unavailable_retried_when_short_raised_when_long(mock):
+    mock.reply(
+        api_error(503, "LINK_CHECK_UNAVAILABLE", headers={"retry-after": "0"}, reason="link_check_failed", platform="tiktok"),
+        job("j5", "created"),
+    )
+    assert mock.client().transcribe(url="https://www.tiktok.com/@someone/video/1")["id"] == "j5"
+    assert len(mock.requests) == 2
+    assert mock.requests[0].headers["idempotency-key"] == mock.requests[1].headers["idempotency-key"]
+    mock.requests.clear()
+    mock.reply(api_error(503, "LINK_CHECK_UNAVAILABLE", headers={"retry-after": "600"}, reason="verify_rate_limited", platform="tiktok"))
+    with pytest.raises(LinkCheckUnavailableError) as busy:
+        mock.client().transcribe(url="https://www.tiktok.com/@someone/video/1")
+    assert isinstance(busy.value, ServiceUnavailableError)
+    assert busy.value.retry_after == 600 and busy.value.error["reason"] == "verify_rate_limited"
+    assert len(mock.requests) == 1
+
+
 def test_typed_errors(mock):
     mock.reply(api_error(402, "ZERO_BALANCE", "Balance is $0 or below. Please deposit funds before transcribing."))
     with pytest.raises(ZeroBalanceError) as e:
@@ -145,7 +175,7 @@ def test_typed_errors(mock):
 
 
 def test_every_code_has_a_class():
-    assert len(API_ERROR_CODES) == 26 and len(TRANSCRIPTION_ERROR_CODES) == 13
+    assert len(API_ERROR_CODES) == 29 and len(TRANSCRIPTION_ERROR_CODES) == 13
     for code in API_ERROR_CODES:
         assert issubclass(ERROR_CLASS_BY_CODE[code], APIError), code
 
