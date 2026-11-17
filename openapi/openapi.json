@@ -886,7 +886,7 @@
           "Transcriptions"
         ],
         "summary": "Start a transcription",
-        "description": "Accepts a job and returns immediately with status \"created\". Supply exactly one of `url` (we download the file) or `upload_id` (from POST /v1/upload). Download and validation happen in the background, so input problems surface on GET /v1/transcribe/{id} with status \"failed\" — not here. The exception is a link to a TikTok, Instagram, Facebook, X or Snapchat post: it is checked before the job is created (this call then takes a few seconds), and a post that can't be transcribed (private, deleted, no video) is refused here with 400 URL_NOT_ACCESSIBLE, `error.reason` and `error.platform`, with nothing created or charged. Duration and cost are determined after download or validation. Requires a non-zero balance: returns 402 ZERO_BALANCE at $0.",
+        "description": "Accepts a job and returns immediately with status \"created\". Supply exactly one of `url` (we download the file), `upload_id` (from POST /v1/upload) or `source_transcription_id` (transcribe an earlier completed job again, from the audio it holds, with new options; within 24 hours of its end, after that 409 SOURCE_EXPIRED). Download and validation happen in the background, so input problems surface on GET /v1/transcribe/{id} with status \"failed\" — not here. The exception is a link to a TikTok, Instagram, Facebook, X or Snapchat post: it is checked before the job is created (this call then takes a few seconds), and a post that can't be transcribed (private, deleted, no video) is refused here with 400 URL_NOT_ACCESSIBLE, `error.reason` and `error.platform`, with nothing created or charged. Duration and cost are determined after download or validation. Requires a non-zero balance: returns 402 ZERO_BALANCE at $0.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -938,6 +938,14 @@
                     "language": "en",
                     "diarize": true,
                     "speaker_count": 2
+                  }
+                },
+                "fromEarlierJob": {
+                  "summary": "Again, from an earlier job's audio (within 24 hours of its end)",
+                  "value": {
+                    "source_transcription_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                    "language": "es",
+                    "diarize": true
                   }
                 }
               }
@@ -1192,7 +1200,7 @@
             }
           },
           "404": {
-            "description": "The upload_id does not exist (UPLOAD_NOT_FOUND).",
+            "description": "The upload_id does not exist (UPLOAD_NOT_FOUND), or source_transcription_id names no transcription of yours (TRANSCRIPTION_NOT_FOUND).",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -1283,7 +1291,7 @@
             }
           },
           "409": {
-            "description": "Another request with the same Idempotency-Key is in flight (IDEMPOTENCY_KEY_LOCKED).",
+            "description": "Another request with the same Idempotency-Key is in flight (IDEMPOTENCY_KEY_LOCKED), or source_transcription_id names a job whose audio was deleted 24 hours after it ended (SOURCE_EXPIRED).",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -1674,7 +1682,7 @@
             "name": "format",
             "in": "query",
             "required": false,
-            "description": "Output format. `json` (default) returns the full structured response and works at any status. `srt`, `vtt` and `text` return the transcript directly with the matching Content-Type and require status=completed; otherwise they return 400 INVALID_REQUEST.",
+            "description": "Output format. `json` (default) returns the full structured response and works at any status. `srt`, `vtt` and `text` return the transcript directly with the matching Content-Type and require status=completed; otherwise they return 400 INVALID_REQUEST with the job's status in `error.current_status`.",
             "schema": {
               "type": "string",
               "enum": [
@@ -1847,7 +1855,7 @@
             }
           },
           "400": {
-            "description": "A caption format was requested for a job that is not completed (INVALID_REQUEST), or a segmentation parameter is out of range.",
+            "description": "A caption format was requested for a job that is not completed (INVALID_REQUEST, with the job's status in `error.current_status`), or a segmentation parameter is out of range.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -5641,6 +5649,7 @@
                   "PAYLOAD_TOO_LARGE",
                   "UNSUPPORTED_MEDIA_TYPE",
                   "IDEMPOTENCY_KEY_LOCKED",
+                  "SOURCE_EXPIRED",
                   "IDEMPOTENCY_KEY_CONFLICT",
                   "RATE_LIMIT_EXCEEDED",
                   "INTERNAL_ERROR",
@@ -5673,6 +5682,7 @@
                   "PAYLOAD_TOO_LARGE": "Request **body** exceeds 100KB. This is the JSON body, not the media file. Large files go to the presigned upload URL, which has its own 5 GB limit.",
                   "UNSUPPORTED_MEDIA_TYPE": "Request body sent without `Content-Type: application/json` on a POST/PUT/PATCH. The response includes an `Accept-Post: application/json` header. Parameters are allowed (`application/json; charset=utf-8` works).",
                   "IDEMPOTENCY_KEY_LOCKED": "Another request with the same `Idempotency-Key` is mid-flight. Retry after a few seconds (`Retry-After` header sent).",
+                  "SOURCE_EXPIRED": "`source_transcription_id` names a job whose audio was deleted 24 hours after it ended, so it cannot be transcribed again: nothing is created or charged. Send the file again with `upload_id` or `url`.",
                   "IDEMPOTENCY_KEY_CONFLICT": "`Idempotency-Key` reused with a different request body. Use a fresh key for a different operation.",
                   "RATE_LIMIT_EXCEEDED": "Too many requests (see Rate Limits), or 25 jobs already in progress on POST /v1/transcribe. On POST /v1/transcribe with a social post link, also a limit on social links set on your account (`error.reason` `social_link_limit`, with `error.limit` and `error.window_seconds`; accounts have none unless Scriptivox sets one); uploads and other links are not affected. Wait the seconds in the `Retry-After` header.",
                   "INTERNAL_ERROR": "Server error",
@@ -5704,6 +5714,7 @@
                   "PAYLOAD_TOO_LARGE": 413,
                   "UNSUPPORTED_MEDIA_TYPE": 415,
                   "IDEMPOTENCY_KEY_LOCKED": 409,
+                  "SOURCE_EXPIRED": 409,
                   "IDEMPOTENCY_KEY_CONFLICT": 422,
                   "RATE_LIMIT_EXCEEDED": 429,
                   "INTERNAL_ERROR": 500,
@@ -5755,6 +5766,17 @@
               "in_flight": {
                 "type": "integer",
                 "description": "On a 429 RATE_LIMIT_EXCEEDED for jobs in progress: how many of your jobs are in progress now."
+              },
+              "current_status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "downloading",
+                  "pending",
+                  "processing",
+                  "failed"
+                ],
+                "description": "On a 400 INVALID_REQUEST from GET /v1/transcribe/{id} with format=srt, vtt or text: the job's status now. The job is not completed yet, or failed; poll until it is completed, then export."
               }
             }
           },
@@ -5922,16 +5944,65 @@
           }
         }
       },
+      "CreateTranscriptionFromEarlierJob": {
+        "type": "object",
+        "title": "CreateTranscriptionFromEarlierJob",
+        "description": "Transcribe the audio of an earlier completed job of yours again, with new options (another `language`, speaker labels on or off): no upload, no download. The options are this request's own; nothing is copied from the earlier job. Charged like any job. The audio is kept 24 hours after a job ends; after that the answer is 409 SOURCE_EXPIRED, and the file has to be sent again.",
+        "required": [
+          "source_transcription_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source_transcription_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The id of a completed transcription of yours that ended less than 24 hours ago. A job not completed: 400 INVALID_REQUEST with `error.current_status`; not yours or deleted: 404 TRANSCRIPTION_NOT_FOUND; its audio deleted: 409 SOURCE_EXPIRED.",
+            "example": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 639-1 language code (with BCP-47 fallbacks such as `yue` and `kea`), e.g. \"en\", \"es\", \"fr\". Omit or pass null for auto-detection. Passing the language explicitly is recommended: it is faster (the model skips its detection pass) and avoids known auto-detect failure modes on short clips, code-switched audio, and files that open with music. Forcing a language the audio is not in can produce a translation rather than a transcription. Invalid codes return 400 INVALID_REQUEST.",
+            "example": "en"
+          },
+          "diarize": {
+            "type": "boolean",
+            "default": false,
+            "description": "Identify who said what and attach a speaker label to every utterance. Implies align: true, because speaker assignment needs word-level alignment."
+          },
+          "speaker_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Expected number of speakers. Requires diarize: true; passing it without diarize returns 400 INVALID_REQUEST. This is a soft prior, not a hard ceiling — the result may contain slightly more or fewer labels. Strongly recommended whenever the count is known: it measurably reduces over- and under-segmentation."
+          },
+          "align": {
+            "type": "boolean",
+            "default": true,
+            "description": "Produce word-level start/end timestamps plus per-word confidence where the alignment model supports it. Confidence is language-dependent and may be null. Ignored (treated as true) when diarize is true."
+          },
+          "webhook_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to receive the job's webhooks (processing, then completed or failed). Must be https://. Signed with the key's webhook signing secret and retried with backoff until your server answers 2xx — see https://platform.scriptivox.com/docs/webhooks."
+          }
+        }
+      },
       "CreateTranscriptionRequest": {
         "type": "object",
         "title": "CreateTranscriptionRequest",
-        "description": "Supply exactly one of `url` (Scriptivox downloads the file) or `upload_id` (returned by POST /v1/upload). Every other property is optional and shared by both forms.",
+        "description": "Supply exactly one of `url` (Scriptivox downloads the file), `upload_id` (returned by POST /v1/upload) or `source_transcription_id` (an earlier completed job of yours, transcribed again from the audio it holds). Every other property is optional and shared by all three forms.",
         "oneOf": [
           {
             "$ref": "#/components/schemas/CreateTranscriptionFromUrl"
           },
           {
             "$ref": "#/components/schemas/CreateTranscriptionFromUpload"
+          },
+          {
+            "$ref": "#/components/schemas/CreateTranscriptionFromEarlierJob"
           }
         ]
       },
@@ -6812,7 +6883,7 @@
           "auto_topup": {
             "type": "object",
             "title": "AutoTopup",
-            "description": "Auto top-up, set on the Billing page of the API dashboard. When on and available_cents falls below threshold_cents, the saved card is charged amount_cents, up to the monthly limit set there. A top-up shows on a later call, not this one.",
+            "description": "Auto top-up, set in Add Funds or on the Billing page of the API dashboard. When on, each time available_cents falls below threshold_cents the saved card is charged amount_cents, one charge at a time. A top-up shows on a later call, not this one.",
             "required": [
               "enabled",
               "threshold_cents",

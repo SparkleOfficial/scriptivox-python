@@ -229,6 +229,7 @@ class AsyncScriptivox:
         url: Optional[str] = None,
         file: Optional[c.FileInput] = None,
         upload_id: Optional[str] = None,
+        source_transcription_id: Optional[str] = None,
         language: Optional[str] = None,
         diarize: Optional[bool] = None,
         speaker_count: Optional[int] = None,
@@ -239,25 +240,54 @@ class AsyncScriptivox:
         on_upload_progress: Optional[c.ProgressCallback] = None,
         idempotency_key: Optional[str] = None,
     ) -> TranscriptionCreated:
-        """Start a transcription from a public ``url``, a local ``file`` (uploaded first) or an earlier
-        ``upload_id``. Returns as soon as the job is accepted (status "created"); call wait(id) next.
+        """Start a transcription from a public ``url``, a local ``file`` (uploaded first), an earlier
+        ``upload_id``, or ``source_transcription_id`` (an earlier completed job, again: see transcribe_again).
+        Returns as soon as the job is accepted (status "created"); call wait(id) next.
         A ``url`` can be a file, a Google Drive, Dropbox or OneDrive share link, or a public TikTok,
         Instagram, Facebook, X or Snapchat post; a post that can't be transcribed raises UrlNotAccessibleError here.
 
         Every call sends an Idempotency-Key (a new UUID unless you pass one), so the SDK's own retries
         never create a second billable job. Omit ``language`` to auto-detect.
         """
-        c.check_one_source(url, file, upload_id)
+        c.check_one_source(url, file, upload_id, source_transcription_id)
         if file is not None:
             upload_id = (await self.upload(file, filename=filename, size=size, on_progress=on_upload_progress))["upload_id"]
         body = c.transcribe_body(
             url,
             upload_id,
             {"language": language, "diarize": diarize, "speaker_count": speaker_count, "align": align, "webhook_url": webhook_url},
+            source_transcription_id,
         )
         return cast(
             TranscriptionCreated,
             await self._send("POST", "/v1/transcribe", body=body, idempotency_key=idempotency_key or str(uuid.uuid4()), idempotent=True),
+        )
+
+    async def transcribe_again(
+        self,
+        source_transcription_id: str,
+        *,
+        language: Optional[str] = None,
+        diarize: Optional[bool] = None,
+        speaker_count: Optional[int] = None,
+        align: Optional[bool] = None,
+        webhook_url: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> TranscriptionCreated:
+        """Transcribe an earlier completed job again, from the audio Scriptivox still holds (no upload,
+        no download), with other options: another ``language``, speaker labels on or off. A new job,
+        charged like any other; the earlier one stays as it is. The options are this call's own: nothing
+        is copied from the earlier job (omit ``language`` and it is detected again). The audio is kept
+        24 hours after a job ends; after that this raises SourceExpiredError (409): send the file again.
+        """
+        return await self.transcribe(
+            source_transcription_id=source_transcription_id,
+            language=language,
+            diarize=diarize,
+            speaker_count=speaker_count,
+            align=align,
+            webhook_url=webhook_url,
+            idempotency_key=idempotency_key,
         )
 
     # ─── read ─────────────────────────────────────────────────────────────────

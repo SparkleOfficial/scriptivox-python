@@ -61,6 +61,20 @@ job = client.transcribe(file="lecture.mp4", on_upload_progress=show)
 
 `file` can be a path, `bytes`, or a binary file object (`open(path, "rb")`). For bytes or a stream without a name, pass `filename="audio.mp3"`. A non-seekable stream also needs `size=`. Filenames are made ASCII-safe for you (`Réunion.mp3` is sent as `Reunion.mp3`).
 
+## Transcribe again with other options
+
+A finished job can be transcribed again from the audio Scriptivox still holds, with another language or speaker labels: no upload, no download. It is a new job, charged like any other. The options are this call's own (omit `language` and it is detected again).
+
+```python
+from scriptivox import SourceExpiredError
+
+try:
+    again = client.transcribe_again(job["id"], language="es", diarize=True)
+    done = client.wait(again["id"])
+except SourceExpiredError:
+    pass  # the audio is kept 24 hours after a job ends: send the file again with transcribe(file=...) or url=
+```
+
 ## Waiting
 
 `wait(id)` polls until the job ends. It waits 2 s between polls at first, growing to 10 s, and honours `Retry-After` when rate-limited. It returns the completed job. A job that fails raises `TranscriptionFailedError`, whose `code` is the job's `error.code`:
