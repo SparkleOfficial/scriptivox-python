@@ -254,18 +254,21 @@ def transcribe_body(
     url: Optional[str],
     upload_id: Optional[str],
     options: Mapping[str, Any],
+    source_transcription_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     body: Dict[str, Any] = {k: options[k] for k in TRANSCRIPTION_OPTION_KEYS if options.get(k) is not None}
     if url is not None:
         body["url"] = url
     if upload_id is not None:
         body["upload_id"] = upload_id
+    if source_transcription_id is not None:
+        body["source_transcription_id"] = source_transcription_id
     return body
 
 
-def check_one_source(url: Any, file: Any, upload_id: Any) -> None:
-    if sum(x is not None for x in (url, file, upload_id)) != 1:
-        raise TypeError("transcribe() needs exactly one of url=, file= or upload_id=.")
+def check_one_source(url: Any, file: Any, upload_id: Any, source_transcription_id: Any = None) -> None:
+    if sum(x is not None for x in (url, file, upload_id, source_transcription_id)) != 1:
+        raise TypeError("transcribe() needs exactly one of url=, file=, upload_id= or source_transcription_id=.")
 
 
 def path_id(transcription_id: str) -> str:

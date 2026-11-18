@@ -19,6 +19,7 @@ from scriptivox import (
     APITimeoutError,
     AuthenticationError,
     BadRequestError,
+    ConflictError,
     InternalError,
     InvalidApiKeyError,
     InvalidRequestError,
@@ -32,6 +33,7 @@ from scriptivox import (
     Scriptivox,
     ScriptivoxError,
     ServiceUnavailableError,
+    SourceExpiredError,
     TranscriptionFailedError,
     TranscriptionNotFoundError,
     UploadFailedError,
@@ -79,6 +81,44 @@ def test_transcribe_needs_exactly_one_source(mock):
         c.transcribe(language="en")
     with pytest.raises(TypeError):
         c.transcribe(url="https://x/a.mp3", upload_id="u")
+
+
+def test_transcribe_again_sends_the_source_with_the_calls_own_options(mock):
+    mock.reply(job("j9", "created"), job("j10", "created"))
+    c = mock.client()
+    out = c.transcribe_again("b2c3d4e5-f6a7-8901-bcde-f12345678901", language="es", diarize=True, idempotency_key="again-1")
+    assert out == {"id": "j9", "status": "created"}
+    r = mock.requests[0]
+    assert (r.method, r.path) == ("POST", "/v1/transcribe")
+    assert r.json == {"language": "es", "diarize": True, "source_transcription_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901"}
+    assert r.headers["idempotency-key"] == "again-1"
+    c.transcribe(source_transcription_id="s1")
+    assert mock.requests[1].json == {"source_transcription_id": "s1"}
+    with pytest.raises(TypeError):
+        c.transcribe(source_transcription_id="s1", url="https://x/a.mp3")
+    with pytest.raises(TypeError):
+        c.transcribe(source_transcription_id="s1", upload_id="u")
+
+
+def test_source_expired_raised_at_once(mock):
+    mock.reply(api_error(409, "SOURCE_EXPIRED", "The audio of transcription s1 was deleted 24 hours after that job ended.", transcription_id="s1"))
+    with pytest.raises(SourceExpiredError) as e:
+        mock.client().transcribe_again("s1", language="fr")
+    assert isinstance(e.value, ConflictError)
+    assert e.value.code == "SOURCE_EXPIRED" and e.value.status == 409
+    assert e.value.error["transcription_id"] == "s1"
+    assert len(mock.requests) == 1
+
+
+def test_async_transcribe_again(mock):
+    mock.reply(job("a9", "created"))
+
+    async def run():
+        async with mock.aclient() as c:
+            return await c.transcribe_again("s2", diarize=True)
+
+    assert asyncio.run(run())["id"] == "a9"
+    assert mock.requests[0].json == {"diarize": True, "source_transcription_id": "s2"}
 
 
 def test_retried_submit_reuses_the_key(mock):
@@ -175,7 +215,7 @@ def test_typed_errors(mock):
 
 
 def test_every_code_has_a_class():
-    assert len(API_ERROR_CODES) == 29 and len(TRANSCRIPTION_ERROR_CODES) == 13
+    assert len(API_ERROR_CODES) == 32 and len(TRANSCRIPTION_ERROR_CODES) == 14
     for code in API_ERROR_CODES:
         assert issubclass(ERROR_CLASS_BY_CODE[code], APIError), code
 
