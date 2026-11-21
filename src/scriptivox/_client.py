@@ -13,6 +13,7 @@ from ._exceptions import (
     APIConnectionError,
     APIError,
     APITimeoutError,
+    MaintenanceError,
     RateLimitError,
     ScriptivoxError,
     TranscriptionFailedError,
@@ -22,6 +23,7 @@ from ._exceptions import (
 from ._types import (
     Balance,
     FeedbackResult,
+    ServiceStatus,
     Transcription,
     TranscriptionCancelled,
     TranscriptionCreated,
@@ -46,7 +48,13 @@ class UploadResult(TypedDict):
     size: int
 
 
+#: Passed as the key by status() and async_status(): a client that sends no key and only calls GET /v1/status.
+_KEYLESS: Any = object()
+
+
 def _resolve_key(api_key: Optional[str]) -> str:
+    if api_key is _KEYLESS:
+        return ""
     key = api_key or os.environ.get("SCRIPTIVOX_API_KEY")
     if not key:
         raise ScriptivoxError("No API key: pass api_key= or set the SCRIPTIVOX_API_KEY environment variable.")
@@ -106,6 +114,7 @@ class Scriptivox:
         text: bool = False,
         timeout: Optional[float] = None,
         max_retries: Optional[int] = None,
+        auth: bool = True,
     ) -> Any:
         retries = self.max_retries if max_retries is None else max_retries
         headers: Dict[str, str] = {
@@ -114,6 +123,8 @@ class Scriptivox:
             "Accept": "text/plain, text/vtt, application/json" if text else "application/json",
             "User-Agent": c.user_agent(),
         }
+        if not auth:  # GET /v1/status needs no key: send none at all
+            headers = {k: v for k, v in headers.items() if k.lower() != "authorization"}
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
         kwargs: Dict[str, Any] = {}
@@ -365,13 +376,16 @@ class Scriptivox:
     ) -> Transcription:
         """Poll until the job ends and return it completed. A failed job raises TranscriptionFailedError
         (its ``code`` is the job's error.code). The wait between polls starts at 2 s and grows to 10 s;
-        a 429 waits out its Retry-After. ``timeout`` is in seconds (default 2 hours)."""
+        a 429, or a MaintenanceError while reads are paused (the job carries on), waits out its Retry-After
+        when that fits in the timeout. ``timeout`` is in seconds (default 2 hours)."""
         deadline = c.monotonic() + timeout
         interval = min(poll_interval, max_poll_interval)
         while True:
             try:
                 job: Transcription = self.get(transcription_id)
-            except RateLimitError as exc:
+            except (RateLimitError, MaintenanceError) as exc:
+                # A rate limit, or full maintenance (reads paused for a few minutes while the job carries
+                # on): wait out the Retry-After and poll again, as long as that fits before the deadline.
                 if exc.retry_after is not None and c.monotonic() + exc.retry_after < deadline:
                     time.sleep(exc.retry_after)
                     continue
@@ -434,6 +448,17 @@ class Scriptivox:
         """Balance, reserved and available amounts in cents, the price per hour and the auto top-up settings."""
         return cast(Balance, self._send("GET", "/v1/balance", idempotent=True))
 
+    def status(self) -> ServiceStatus:
+        """GET /v1/status: whether the API is taking new jobs right now, what is paused for maintenance and
+        why (each pause's scope, message, the calls it stops and back_by, the time we expect it to end if
+        we set one), what still works, how long to wait, and planned maintenance ahead. Sends no API key:
+        the call needs none and is limited per IP. With no key at all, use ``scriptivox.status()``.
+
+        Read ``status``: "operational", "maintenance" or "unknown". "unknown" means the state could not be
+        checked just now, not that the API is down. If the call itself gets no answer, this raises
+        APIConnectionError; it never turns a failed call into a status."""
+        return cast(ServiceStatus, self._send("GET", "/v1/status", idempotent=True, auth=False))
+
     # ─── webhooks and feedback ────────────────────────────────────────────────
 
     def resend_webhook(self, transcription_id: str) -> WebhookSendResult:
@@ -467,3 +492,32 @@ class Scriptivox:
     def verify_webhook(raw_body: Union[bytes, str], headers: HeadersLike, secret: str, *, tolerance: int = 300, now: Optional[float] = None) -> WebhookEvent:
         """Same as the module-level verify_webhook()."""
         return verify_webhook(raw_body, headers, secret, tolerance=tolerance, now=now)
+
+
+def status(
+    *,
+    base_url: Optional[str] = None,
+    max_retries: int = c.DEFAULT_MAX_RETRIES,
+    timeout: float = c.DEFAULT_TIMEOUT,
+    http_client: Optional[httpx.Client] = None,
+    default_headers: Optional[Mapping[str, str]] = None,
+) -> ServiceStatus:
+    """GET /v1/status with no client and no API key (an Authorization header is never sent).
+
+    >>> import scriptivox
+    >>> s = scriptivox.status()
+    >>> if s["accepting_new_jobs"] is False:
+    ...     print([p["name"] for p in s["maintenance"]["paused"]])
+
+    Read ``status``: "operational", "maintenance" or "unknown". "unknown" means the state could not be
+    checked just now, not that the API is down. If the call itself gets no answer, this raises
+    APIConnectionError; it never turns a failed call into a status."""
+    with Scriptivox(
+        _KEYLESS,
+        base_url=base_url,
+        max_retries=max_retries,
+        timeout=timeout,
+        http_client=http_client,
+        default_headers=default_headers,
+    ) as client:
+        return client.status()

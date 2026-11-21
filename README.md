@@ -158,7 +158,7 @@ except APIError as e:
 | `NotFoundError` (404): `TranscriptionNotFoundError`, `UploadNotFoundError` | Wrong id |
 | `ConflictError` (409), `IdempotencyKeyLockedError` | Not allowed in the job's current state |
 | `RateLimitError` (429): `RateLimitExceededError` | Too many requests, or too many jobs in progress |
-| `InternalServerError` (5xx), `ServiceUnavailableError` (503): `MaintenanceError`, `LinkCheckUnavailableError` | Our side; safe to retry after `e.retry_after` seconds |
+| `InternalServerError` (5xx), `ServiceUnavailableError` (503): `MaintenanceError` (see [Maintenance](#maintenance)), `LinkCheckUnavailableError` | Our side; safe to retry after `e.retry_after` seconds |
 | `APIConnectionError`, `APITimeoutError` | No answer |
 | `UploadFailedError` | The file upload itself failed |
 | `TranscriptionFailedError` | `wait()`: the job ended failed |
@@ -167,10 +167,47 @@ except APIError as e:
 
 The full list of codes is in the [API reference](https://platform.scriptivox.com/docs/api-reference#error-codes).
 
+## Maintenance
+
+Now and then part of the API is paused for maintenance. A paused request answers `503 MAINTENANCE` and the SDK raises `MaintenanceError`: nothing was created or charged, so send the same request again later. Jobs already accepted always finish.
+
+```python
+from scriptivox import MaintenanceError
+
+try:
+    client.transcribe(file="meeting.mp3")
+except MaintenanceError as e:
+    print(e.message)      # what is paused, with our message
+    print(e.scope)        # "upload", "link" or "global"
+    print(e.back_by)      # when we expect it back (ISO 8601, UTC), or None
+    print(e.retry_after)  # seconds to wait before sending it again
+    print(e.status_url)   # the status call below
+```
+
+`status()` says whether the API is taking new jobs, before you send any. It needs no API key (the call is limited per IP):
+
+```python
+import scriptivox
+
+s = scriptivox.status()  # or client.status(); await scriptivox.async_status() in asyncio
+if s["accepting_new_jobs"] is False:
+    for p in s["maintenance"]["paused"]:
+        print(p["name"], p["message"] or "", p["back_by"] or "")
+    print("Try again in", s["maintenance"]["retry_after_seconds"], "seconds")
+elif s["status"] == "unknown":
+    print("Could not check just now")  # not the same as "down"
+```
+
+- `status` is `operational`, `maintenance` or `unknown`. `unknown` means the state could not be checked just now, not that the API is down; the fields that could not be checked are then `None`.
+- Scope `link`: only links to video and social media sites are paused on `transcribe()`. Uploads and other file links carry on, so `accepting_new_jobs` stays `True`.
+- Full maintenance (a few minutes, for example during a planned upgrade) pauses every call, reads included: scope `global` and an empty `still_working`. `wait()` waits it out and carries on polling.
+- If the status call itself gets no answer, `status()` raises `APIConnectionError`. It never reports "all fine" from a failed call.
+- Uptime and incident history: [status.scriptivox.com](https://status.scriptivox.com).
+
 ## Retries, timeouts and idempotency
 
 - Requests that are safe to repeat (reads, deletes, cancels and submits with an `Idempotency-Key`) are retried up to 2 times after a dropped connection or a 5xx, waiting longer before each try (0.5 s, 1 s, 2 s, …).
-- A `429` or `503` with `Retry-After` is retried after that many seconds, if it is 60 s or less. A `429` without `Retry-After` (the jobs-in-progress cap) is raised at once.
+- A `429` or `503` with `Retry-After` is retried after that many seconds, if it is 60 s or less. A `429` without `Retry-After` (the jobs-in-progress cap) is raised at once. A maintenance pause usually asks for 5 minutes or more, so its `MaintenanceError` is raised for you to handle (see [Maintenance](#maintenance)).
 - `upload()` and `transcribe()` send a new random `Idempotency-Key` per call, reused on the SDK's own retries. Pass `idempotency_key=` (for example your own record id) to make a retry after a crash safe too.
 
 ```python

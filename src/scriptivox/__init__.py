@@ -7,8 +7,8 @@
     done = client.wait(job["id"])
     print(done["result"]["full_transcript"])
 """
-from ._async_client import AsyncScriptivox
-from ._client import Scriptivox, UploadResult
+from ._async_client import AsyncScriptivox, async_status
+from ._client import Scriptivox, UploadResult, status
 from ._common import DEFAULT_BASE_URL, UploadProgress, safe_filename
 from ._error_codes import *  # noqa: F401,F403  (one exception class per error.code)
 from ._error_codes import API_ERROR_CODES, ERROR_CLASS_BY_CODE, HTTP_STATUS_BY_CODE, TRANSCRIPTION_ERROR_CODES
@@ -42,6 +42,10 @@ from ._types import (
     Balance,
     FeedbackRequest,
     FeedbackResult,
+    ServiceStatus,
+    ServiceStatusMaintenance,
+    ServiceStatusPause,
+    ServiceStatusWindow,
     Transcription,
     TranscriptionCancelled,
     TranscriptionCreated,
@@ -75,6 +79,8 @@ from ._webhooks import (
 __all__ = [
     "Scriptivox",
     "AsyncScriptivox",
+    "status",
+    "async_status",
     "verify_webhook",
     "compute_signature",
     "safe_filename",
@@ -113,6 +119,10 @@ __all__ = [
     "Balance",
     "FeedbackRequest",
     "FeedbackResult",
+    "ServiceStatus",
+    "ServiceStatusMaintenance",
+    "ServiceStatusPause",
+    "ServiceStatusWindow",
     "Transcription",
     "TranscriptionCancelled",
     "TranscriptionCreated",

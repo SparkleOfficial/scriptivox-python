@@ -6,7 +6,8 @@
     │   ├── AuthenticationError (401)   │   generated in _error_codes.py from the OpenAPI document)
     │   ├── PaymentRequiredError (402)  ├── InsufficientBalanceError, ZeroBalanceError
     │   ├── ... one class per HTTP status the API uses
-    │   └── RateLimitError (429)        └── RateLimitExceededError
+    │   ├── RateLimitError (429)        ├── RateLimitExceededError
+    │   └── ServiceUnavailableError     └── MaintenanceError (503, written here: scope, status_url, back_by)
     ├── APIConnectionError              no answer: DNS, refused, reset (APITimeoutError: no answer in time)
     ├── UploadFailedError               the file PUT to the presigned upload URL failed
     ├── TranscriptionFailedError        wait(): the job ended with status "failed" (code = the job's error.code)
@@ -110,6 +111,37 @@ class InternalServerError(APIError):
 
 class ServiceUnavailableError(APIError):
     pass
+
+
+class MaintenanceError(ServiceUnavailableError):
+    """``MAINTENANCE`` (HTTP 503). This part of the API is briefly paused for maintenance: nothing was
+    created or charged. Send the same request again after ``retry_after`` seconds. ``status()``
+    (GET /v1/status, no API key needed) says what is paused, what still works and how long to wait.
+    Jobs already accepted always finish.
+    """
+
+    @property
+    def scope(self) -> Optional[str]:
+        """What is paused, as ``error.scope`` names it: "upload" (new jobs and uploads), "link" (a link to
+        a video or social media site on transcribe; uploads and other file addresses carry on) or
+        "global" (site-wide maintenance, or full maintenance, which pauses every call, reads included).
+        New values may be added. None when the answer had none."""
+        value = self.error.get("scope")
+        return value if isinstance(value, str) else None
+
+    @property
+    def status_url(self) -> Optional[str]:
+        """``error.status_url``: the address of GET /v1/status. None when the answer had none."""
+        value = self.error.get("status_url")
+        return value if isinstance(value, str) else None
+
+    @property
+    def back_by(self) -> Optional[str]:
+        """``error.back_by``: when the pause is expected to end, if a time was set (ISO 8601, UTC); otherwise
+        None. ``retry_after`` then counts the seconds until it (at most an hour). It is a plan: ``status()``
+        says when the pause is really over."""
+        value = self.error.get("back_by")
+        return value if isinstance(value, str) else None
 
 
 _CATEGORY_BY_STATUS: Dict[int, Type[APIError]] = {

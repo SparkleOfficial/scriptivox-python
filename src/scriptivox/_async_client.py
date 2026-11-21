@@ -13,6 +13,7 @@ from ._exceptions import (
     APIConnectionError,
     APIError,
     APITimeoutError,
+    MaintenanceError,
     RateLimitError,
     ScriptivoxError,
     TranscriptionFailedError,
@@ -22,6 +23,7 @@ from ._exceptions import (
 from ._types import (
     Balance,
     FeedbackResult,
+    ServiceStatus,
     Transcription,
     TranscriptionCancelled,
     TranscriptionCreated,
@@ -35,7 +37,7 @@ from ._webhooks import HeadersLike, WebhookEvent, verify_webhook
 
 from typing import Literal
 
-from ._client import _MISSING, UploadResult, _resolve_key
+from ._client import _KEYLESS, _MISSING, UploadResult, _resolve_key
 
 
 async def _aiter(chunks: Any) -> Any:
@@ -96,6 +98,7 @@ class AsyncScriptivox:
         text: bool = False,
         timeout: Optional[float] = None,
         max_retries: Optional[int] = None,
+        auth: bool = True,
     ) -> Any:
         retries = self.max_retries if max_retries is None else max_retries
         headers: Dict[str, str] = {
@@ -104,6 +107,8 @@ class AsyncScriptivox:
             "Accept": "text/plain, text/vtt, application/json" if text else "application/json",
             "User-Agent": c.user_agent(),
         }
+        if not auth:  # GET /v1/status needs no key: send none at all
+            headers = {k: v for k, v in headers.items() if k.lower() != "authorization"}
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
         kwargs: Dict[str, Any] = {}
@@ -355,13 +360,16 @@ class AsyncScriptivox:
     ) -> Transcription:
         """Poll until the job ends and return it completed. A failed job raises TranscriptionFailedError
         (its ``code`` is the job's error.code). The wait between polls starts at 2 s and grows to 10 s;
-        a 429 waits out its Retry-After. ``timeout`` is in seconds (default 2 hours)."""
+        a 429, or a MaintenanceError while reads are paused (the job carries on), waits out its Retry-After
+        when that fits in the timeout. ``timeout`` is in seconds (default 2 hours)."""
         deadline = c.monotonic() + timeout
         interval = min(poll_interval, max_poll_interval)
         while True:
             try:
                 job: Transcription = await self.get(transcription_id)
-            except RateLimitError as exc:
+            except (RateLimitError, MaintenanceError) as exc:
+                # A rate limit, or full maintenance (reads paused for a few minutes while the job carries
+                # on): wait out the Retry-After and poll again, as long as that fits before the deadline.
                 if exc.retry_after is not None and c.monotonic() + exc.retry_after < deadline:
                     await asyncio.sleep(exc.retry_after)
                     continue
@@ -425,6 +433,16 @@ class AsyncScriptivox:
         """Balance, reserved and available amounts in cents, the price per hour and the auto top-up settings."""
         return cast(Balance, await self._send("GET", "/v1/balance", idempotent=True))
 
+    async def status(self) -> ServiceStatus:
+        """GET /v1/status: whether the API is taking new jobs right now, what is paused for maintenance and
+        why, what still works, how long to wait, and planned maintenance ahead. Sends no API key: the call
+        needs none and is limited per IP. With no key at all, use ``scriptivox.async_status()``.
+
+        Read ``status``: "operational", "maintenance" or "unknown". "unknown" means the state could not be
+        checked just now, not that the API is down. If the call itself gets no answer, this raises
+        APIConnectionError; it never turns a failed call into a status."""
+        return cast(ServiceStatus, await self._send("GET", "/v1/status", idempotent=True, auth=False))
+
     # ─── webhooks and feedback ────────────────────────────────────────────────
 
     async def resend_webhook(self, transcription_id: str) -> WebhookSendResult:
@@ -458,3 +476,25 @@ class AsyncScriptivox:
     def verify_webhook(raw_body: Union[bytes, str], headers: HeadersLike, secret: str, *, tolerance: int = 300, now: Optional[float] = None) -> WebhookEvent:
         """Same as the module-level verify_webhook()."""
         return verify_webhook(raw_body, headers, secret, tolerance=tolerance, now=now)
+
+
+async def async_status(
+    *,
+    base_url: Optional[str] = None,
+    max_retries: int = c.DEFAULT_MAX_RETRIES,
+    timeout: float = c.DEFAULT_TIMEOUT,
+    http_client: Optional[httpx.AsyncClient] = None,
+    default_headers: Optional[Mapping[str, str]] = None,
+) -> ServiceStatus:
+    """``scriptivox.status()`` for asyncio: GET /v1/status with no client and no API key.
+
+    >>> s = await scriptivox.async_status()"""
+    async with AsyncScriptivox(
+        _KEYLESS,
+        base_url=base_url,
+        max_retries=max_retries,
+        timeout=timeout,
+        http_client=http_client,
+        default_headers=default_headers,
+    ) as client:
+        return await client.status()

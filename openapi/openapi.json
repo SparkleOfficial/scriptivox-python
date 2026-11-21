@@ -83,6 +83,10 @@
     {
       "name": "Discovery",
       "description": "Unauthenticated description of the API itself — endpoints, auth scheme, rate limits and versioning policy."
+    },
+    {
+      "name": "Status",
+      "description": "Whether the API is taking new jobs right now, why not, and what still works. No API key needed."
     }
   ],
   "paths": {
@@ -145,6 +149,358 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceDiscovery"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The path exists but only accepts a different HTTP method. The response carries an `Allow` header naming the accepted method.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Allow": {
+                "description": "The HTTP method this path accepts.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (RATE_LIMIT_EXCEEDED). Limits use a sliding 60-second window, per API key per endpoint, plus a 300/min per-IP cap across all endpoints. `Retry-After` and `RateLimit-Policy` are always present; `RateLimit` and `X-RateLimit-Remaining` are present when the per-key limiter is what rejected the request, and absent when the per-IP cap or an abuse block rejected it before the key was read.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "RateLimit": {
+                "description": "Remaining quota for this API key on this endpoint, as an RFC 9651 structured field. `r` is the remaining request count, `t` the seconds until the window resets. Only sent once the API key has been validated.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";r=57;t=41"
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests remaining in the current rolling 60-second window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp (seconds) at which the window fully resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-rateLimit": {
+          "requestsPerMinute": 100,
+          "window": "60s",
+          "scope": "ip"
+        }
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "operationId": "getServiceStatus",
+        "tags": [
+          "Status"
+        ],
+        "summary": "Check whether the API is taking new jobs",
+        "description": "Says whether the API is taking new jobs right now and, if something is paused for maintenance, what is paused, the message we wrote, which operations still work and how long to wait. Also lists planned maintenance that has not started yet. Needs no API key, so a monitor can poll it without using a key's limits; it is limited per IP instead. `status` is `operational`, `maintenance` or `unknown`. `unknown` means the state could not be checked just now, not that the API is down. Only a pause that can stop an API call is reported: maintenance of other parts of Scriptivox (for example the website's converter pages) leaves this `operational`. The answer can be a few seconds old and can trail a change by up to about 30 seconds. A paused `POST /v1/upload` or `POST /v1/transcribe` answers `503 MAINTENANCE` with `Retry-After: 300` and a `status_url` pointing here. Jobs already accepted always finish. When we set a time a pause should end by, its entry has `back_by` and `retry_after_seconds` counts down to it (at least 60 and at most 3600 seconds); the 503 carries the same `error.back_by`. A time is a plan, not a promise: `status` says when the pause is really over. While link imports are paused, a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) answers `503 MAINTENANCE` with `error.scope` `link`; uploads and other file addresses carry on. Then `status` is `maintenance` with one entry of scope `link` naming `POST /v1/transcribe`, which stays in `still_working`, and `accepting_new_jobs` stays true. During full maintenance (for example during a planned upgrade) every operation is paused, reads included: `status` is `maintenance` with one entry of scope `global` that names every operation, `still_working` is empty, and every call answers `503 MAINTENANCE` with scope `global`. Site-wide maintenance also uses scope `global` but stops only new jobs and uploads; its `still_working` lists the rest. This call keeps answering in both.",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The status. Always 200, whatever the state: read `status`. Carries the full RateLimit set, counted per IP.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "RateLimit": {
+                "description": "Remaining quota for this API key on this endpoint, as an RFC 9651 structured field. `r` is the remaining request count, `t` the seconds until the window resets. Only sent once the API key has been validated.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";r=57;t=41"
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests remaining in the current rolling 60-second window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp (seconds) at which the window fully resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceStatus"
+                },
+                "examples": {
+                  "operational": {
+                    "summary": "Nothing that can stop an API call is paused; one planned window ahead",
+                    "value": {
+                      "status": "operational",
+                      "accepting_new_jobs": true,
+                      "maintenance": null,
+                      "still_working": [
+                        "POST /v1/upload",
+                        "POST /v1/transcribe",
+                        "GET /v1/transcribe/{id}",
+                        "DELETE /v1/transcribe/{id}",
+                        "POST /v1/transcribe/{id}/cancel",
+                        "POST /v1/transcribe/{id}/webhook/resend",
+                        "POST /v1/webhooks/test",
+                        "POST /v1/transcribe/{id}/feedback",
+                        "GET /v1/transcriptions",
+                        "GET /v1/balance"
+                      ],
+                      "upcoming": [
+                        {
+                          "title": "Planned upgrade",
+                          "message": "New jobs are paused for about 30 minutes. Jobs already accepted finish.",
+                          "starts_at": "2026-11-22T02:00:00.000Z",
+                          "ends_at": "2026-11-22T02:30:00.000Z"
+                        }
+                      ],
+                      "checked_at": "2026-11-20T14:02:11.000Z",
+                      "status_page": "https://status.scriptivox.com"
+                    }
+                  },
+                  "maintenance": {
+                    "summary": "New jobs and uploads are paused",
+                    "value": {
+                      "status": "maintenance",
+                      "accepting_new_jobs": false,
+                      "maintenance": {
+                        "paused": [
+                          {
+                            "scope": "upload",
+                            "name": "Starting new jobs and uploads",
+                            "message": "Planned upgrade until 10:30 UTC.",
+                            "routes": [
+                              "POST /v1/upload",
+                              "POST /v1/transcribe"
+                            ],
+                            "back_by": null
+                          }
+                        ],
+                        "retry_after_seconds": 300
+                      },
+                      "still_working": [
+                        "GET /v1/transcribe/{id}",
+                        "DELETE /v1/transcribe/{id}",
+                        "POST /v1/transcribe/{id}/cancel",
+                        "POST /v1/transcribe/{id}/webhook/resend",
+                        "POST /v1/webhooks/test",
+                        "POST /v1/transcribe/{id}/feedback",
+                        "GET /v1/transcriptions",
+                        "GET /v1/balance"
+                      ],
+                      "upcoming": [],
+                      "checked_at": "2026-11-20T14:02:11.000Z",
+                      "status_page": "https://status.scriptivox.com"
+                    }
+                  },
+                  "maintenanceBackBy": {
+                    "summary": "New jobs and uploads are paused, expected back by a set time",
+                    "value": {
+                      "status": "maintenance",
+                      "accepting_new_jobs": false,
+                      "maintenance": {
+                        "paused": [
+                          {
+                            "scope": "upload",
+                            "name": "Starting new jobs and uploads",
+                            "message": "Planned upgrade. Jobs already accepted finish.",
+                            "routes": [
+                              "POST /v1/upload",
+                              "POST /v1/transcribe"
+                            ],
+                            "back_by": "2026-11-20T14:30:00.000Z"
+                          }
+                        ],
+                        "retry_after_seconds": 1669
+                      },
+                      "still_working": [
+                        "GET /v1/transcribe/{id}",
+                        "DELETE /v1/transcribe/{id}",
+                        "POST /v1/transcribe/{id}/cancel",
+                        "POST /v1/transcribe/{id}/webhook/resend",
+                        "POST /v1/webhooks/test",
+                        "POST /v1/transcribe/{id}/feedback",
+                        "GET /v1/transcriptions",
+                        "GET /v1/balance"
+                      ],
+                      "upcoming": [],
+                      "checked_at": "2026-11-20T14:02:11.000Z",
+                      "status_page": "https://status.scriptivox.com"
+                    }
+                  },
+                  "linkPaused": {
+                    "summary": "Links to video sites are paused; uploads and file addresses carry on",
+                    "value": {
+                      "status": "maintenance",
+                      "accepting_new_jobs": true,
+                      "maintenance": {
+                        "paused": [
+                          {
+                            "scope": "link",
+                            "name": "Transcribing from a link to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat)",
+                            "message": "Planned upgrade until 10:30 UTC.",
+                            "routes": [
+                              "POST /v1/transcribe"
+                            ],
+                            "back_by": null
+                          }
+                        ],
+                        "retry_after_seconds": 300
+                      },
+                      "still_working": [
+                        "POST /v1/upload",
+                        "POST /v1/transcribe",
+                        "GET /v1/transcribe/{id}",
+                        "DELETE /v1/transcribe/{id}",
+                        "POST /v1/transcribe/{id}/cancel",
+                        "POST /v1/transcribe/{id}/webhook/resend",
+                        "POST /v1/webhooks/test",
+                        "POST /v1/transcribe/{id}/feedback",
+                        "GET /v1/transcriptions",
+                        "GET /v1/balance"
+                      ],
+                      "upcoming": [],
+                      "checked_at": "2026-11-20T14:02:11.000Z",
+                      "status_page": "https://status.scriptivox.com"
+                    }
+                  },
+                  "fullMaintenance": {
+                    "summary": "Everything is paused, reads included (a planned upgrade)",
+                    "value": {
+                      "status": "maintenance",
+                      "accepting_new_jobs": false,
+                      "maintenance": {
+                        "paused": [
+                          {
+                            "scope": "global",
+                            "name": "All of Scriptivox, reading included",
+                            "message": "Planned upgrade until 10:30 UTC.",
+                            "routes": [
+                              "POST /v1/upload",
+                              "POST /v1/transcribe",
+                              "GET /v1/transcribe/{id}",
+                              "DELETE /v1/transcribe/{id}",
+                              "POST /v1/transcribe/{id}/cancel",
+                              "POST /v1/transcribe/{id}/webhook/resend",
+                              "POST /v1/webhooks/test",
+                              "POST /v1/transcribe/{id}/feedback",
+                              "GET /v1/transcriptions",
+                              "GET /v1/balance"
+                            ],
+                            "back_by": null
+                          }
+                        ],
+                        "retry_after_seconds": 300
+                      },
+                      "still_working": [],
+                      "upcoming": null,
+                      "checked_at": "2026-11-20T14:02:11.000Z",
+                      "status_page": "https://status.scriptivox.com"
+                    }
+                  },
+                  "unknown": {
+                    "summary": "The state could not be checked just now",
+                    "value": {
+                      "status": "unknown",
+                      "accepting_new_jobs": null,
+                      "maintenance": null,
+                      "still_working": null,
+                      "upcoming": null,
+                      "checked_at": "2026-11-20T14:02:11.000Z",
+                      "status_page": "https://status.scriptivox.com"
+                    }
+                  }
                 }
               }
             }
@@ -871,6 +1227,108 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "New uploads are paused for maintenance (MAINTENANCE): `error.scope` says what is paused, `error.status_url` is GET /v1/status, which says what still works. Nothing was created or charged; send the same request again after the `Retry-After` seconds. `Retry-After` is 300 seconds; when we set a time the pause should end by, `error.back_by` gives it (ISO 8601, UTC) and `Retry-After` counts the seconds until then, at least 60 and at most 3600, so a long pause is looked at again within the hour. A time that has passed is never sent. During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "RateLimit": {
+                "description": "Remaining quota for this API key on this endpoint, as an RFC 9651 structured field. `r` is the remaining request count, `t` the seconds until the window resets. Only sent once the API key has been validated.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";r=57;t=41"
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests remaining in the current rolling 60-second window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp (seconds) at which the window fully resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "maintenance": {
+                    "summary": "New jobs and uploads are paused for maintenance",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade until 10:30 UTC.",
+                        "scope": "upload",
+                        "back_by": null,
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  },
+                  "maintenanceBackBy": {
+                    "summary": "Paused, expected back by a set time (Retry-After counts down to it)",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade. Jobs already accepted finish.",
+                        "scope": "upload",
+                        "back_by": "2026-11-20T14:30:00.000Z",
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  },
+                  "fullMaintenance": {
+                    "summary": "The whole service is paused for maintenance (a planned upgrade)",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade until 10:30 UTC.",
+                        "scope": "global",
+                        "back_by": null,
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "x-rateLimit": {
@@ -1577,7 +2035,7 @@
             }
           },
           "503": {
-            "description": "A social post link could not be checked right now (LINK_CHECK_UNAVAILABLE): `error.reason` verify_rate_limited when link checks are busy (`Retry-After: 600`), link_check_failed when the check did not answer (`Retry-After: 60`). Or the API is briefly paused for maintenance (MAINTENANCE). Or the upload_id's upload could not be read just now (TEMPORARILY_UNAVAILABLE). Nothing was created or charged; send the same request again after the `Retry-After` seconds.",
+            "description": "A social post link could not be checked right now (LINK_CHECK_UNAVAILABLE): `error.reason` verify_rate_limited when link checks are busy (`Retry-After: 600`), link_check_failed when the check did not answer (`Retry-After: 60`). Or new jobs are paused for maintenance (MAINTENANCE): `error.scope` says what is paused, `error.status_url` is GET /v1/status. `Retry-After` is 300 seconds; when we set a time the pause should end by, `error.back_by` gives it (ISO 8601, UTC) and `Retry-After` counts the seconds until then, at least 60 and at most 3600, so a long pause is looked at again within the hour. A time that has passed is never sent. While link imports are paused, a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) answers `503 MAINTENANCE` with `error.scope` `link`; uploads and other file addresses carry on. Or the upload_id's upload could not be read just now (TEMPORARILY_UNAVAILABLE). Nothing was created or charged; send the same request again after the `Retry-After` seconds. During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -1631,14 +2089,75 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 },
-                "example": {
-                  "error": {
-                    "code": "LINK_CHECK_UNAVAILABLE",
-                    "message": "Link checks are busy right now. Please wait a few minutes and try again.",
-                    "reason": "verify_rate_limited",
-                    "platform": "instagram",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
-                    "request_id": "req_8f3a1c2b9d4e6f70"
+                "examples": {
+                  "linkCheckUnavailable": {
+                    "summary": "A social post link could not be checked right now",
+                    "value": {
+                      "error": {
+                        "code": "LINK_CHECK_UNAVAILABLE",
+                        "message": "Link checks are busy right now. Please wait a few minutes and try again.",
+                        "reason": "verify_rate_limited",
+                        "platform": "instagram",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  },
+                  "maintenance": {
+                    "summary": "New jobs are paused for maintenance",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade until 10:30 UTC.",
+                        "scope": "upload",
+                        "back_by": null,
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  },
+                  "maintenanceBackBy": {
+                    "summary": "Paused, expected back by a set time (Retry-After counts down to it)",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade. Jobs already accepted finish.",
+                        "scope": "upload",
+                        "back_by": "2026-11-20T14:30:00.000Z",
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  },
+                  "linkMaintenance": {
+                    "summary": "Links to video sites are paused for maintenance",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade until 10:30 UTC.",
+                        "scope": "link",
+                        "back_by": null,
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  },
+                  "fullMaintenance": {
+                    "summary": "The whole service is paused for maintenance (a planned upgrade)",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade until 10:30 UTC.",
+                        "scope": "global",
+                        "back_by": null,
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
                   }
                 }
               }
@@ -2193,7 +2712,7 @@
             }
           },
           "503": {
-            "description": "The transcription, or its finished transcript, could not be read just now (TEMPORARILY_UNAVAILABLE). Nothing was changed: send the same request again after the `Retry-After` seconds. It says nothing about whether the transcription exists.",
+            "description": "The transcription, or its finished transcript, could not be read just now (TEMPORARILY_UNAVAILABLE). Nothing was changed: send the same request again after the `Retry-After` seconds. It says nothing about whether the transcription exists. During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -2247,12 +2766,31 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 },
-                "example": {
-                  "error": {
-                    "code": "TEMPORARILY_UNAVAILABLE",
-                    "message": "The transcription could not be read just now (a brief problem on our side). Nothing was changed. Send the same request again in 5 seconds.",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
-                    "request_id": "req_8f3a1c2b9d4e6f70"
+                "examples": {
+                  "temporarilyUnavailable": {
+                    "summary": "The transcription could not be read just now",
+                    "value": {
+                      "error": {
+                        "code": "TEMPORARILY_UNAVAILABLE",
+                        "message": "The transcription could not be read just now (a brief problem on our side). Nothing was changed. Send the same request again in 5 seconds.",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
+                  },
+                  "fullMaintenance": {
+                    "summary": "The whole service is paused for maintenance (a planned upgrade)",
+                    "value": {
+                      "error": {
+                        "code": "MAINTENANCE",
+                        "message": "Planned upgrade until 10:30 UTC.",
+                        "scope": "global",
+                        "back_by": null,
+                        "status_url": "https://api.scriptivox.com/v1/status",
+                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "request_id": "req_8f3a1c2b9d4e6f70"
+                      }
+                    }
                   }
                 }
               }
@@ -2671,6 +3209,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The service is paused for maintenance (MAINTENANCE). During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same. Send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "MAINTENANCE",
+                    "message": "Planned upgrade until 10:30 UTC.",
+                    "scope": "global",
+                    "back_by": null,
+                    "status_url": "https://api.scriptivox.com/v1/status",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
                 }
               }
             }
@@ -3106,6 +3694,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The service is paused for maintenance (MAINTENANCE). During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same. Send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "MAINTENANCE",
+                    "message": "Planned upgrade until 10:30 UTC.",
+                    "scope": "global",
+                    "back_by": null,
+                    "status_url": "https://api.scriptivox.com/v1/status",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
                 }
               }
             }
@@ -3596,6 +4234,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The service is paused for maintenance (MAINTENANCE). During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same. Send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "MAINTENANCE",
+                    "message": "Planned upgrade until 10:30 UTC.",
+                    "scope": "global",
+                    "back_by": null,
+                    "status_url": "https://api.scriptivox.com/v1/status",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
                 }
               }
             }
@@ -4104,6 +4792,56 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "The service is paused for maintenance (MAINTENANCE). During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same. Send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "MAINTENANCE",
+                    "message": "Planned upgrade until 10:30 UTC.",
+                    "scope": "global",
+                    "back_by": null,
+                    "status_url": "https://api.scriptivox.com/v1/status",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
+                }
+              }
+            }
           }
         },
         "x-rateLimit": {
@@ -4489,6 +5227,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The service is paused for maintenance (MAINTENANCE). During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same. Send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "MAINTENANCE",
+                    "message": "Planned upgrade until 10:30 UTC.",
+                    "scope": "global",
+                    "back_by": null,
+                    "status_url": "https://api.scriptivox.com/v1/status",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
                 }
               }
             }
@@ -4920,6 +5708,56 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "The service is paused for maintenance (MAINTENANCE). During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same. Send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "MAINTENANCE",
+                    "message": "Planned upgrade until 10:30 UTC.",
+                    "scope": "global",
+                    "back_by": null,
+                    "status_url": "https://api.scriptivox.com/v1/status",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
+                }
+              }
+            }
           }
         },
         "x-rateLimit": {
@@ -5242,6 +6080,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The service is paused for maintenance (MAINTENANCE). During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same. Send the same request again after the `Retry-After` seconds.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^req_[0-9a-f]{16}$"
+                },
+                "example": "req_8f3a1c2b9d4e6f70"
+              },
+              "RateLimit-Policy": {
+                "description": "Quota policies for this request, as an RFC 9651 structured field list (draft-ietf-httpapi-ratelimit-headers). `q` is the quota, `w` the window in seconds. Two policies are always listed: `\"endpoint\"` (per API key, per endpoint) and `\"ip\"` (per source IP, across all endpoints). Present on every response, including 401 and 429 — you do not need a valid key to learn the limits.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"endpoint\";q=60;w=60, \"ip\";q=300;w=60"
+              },
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests allowed per minute for this endpoint. The legacy spelling of the `q` parameter in RateLimit-Policy; both are sent.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before sending the request again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "MAINTENANCE",
+                    "message": "Planned upgrade until 10:30 UTC.",
+                    "scope": "global",
+                    "back_by": null,
+                    "status_url": "https://api.scriptivox.com/v1/status",
+                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "request_id": "req_8f3a1c2b9d4e6f70"
+                  }
                 }
               }
             }
@@ -5735,7 +6623,7 @@
                   "FILE_TOO_LARGE": "File exceeds 5 GB limit",
                   "UPLOAD_ALREADY_USED": "Upload already used for a transcription",
                   "UPLOAD_EXPIRED": "Upload URL expired (1 hour TTL)",
-                  "URL_NOT_ACCESSIBLE": "A TikTok, Instagram, Facebook, X or Snapchat post that can't be transcribed, refused when you send it: nothing is created or charged. `error.reason` says why: `link_not_verifiable` (private, deleted or not available in the region), `link_not_found` (the video can't be opened), `link_unsupported` (a kind of link that is not a video, such as a Facebook Page or profile), `link_no_media` (no audio or video, such as a photo post); `error.platform` names the site. Sending the same link again gives the same answer. Other links that can't be downloaded fail later on `GET /v1/transcribe/{id}`.",
+                  "URL_NOT_ACCESSIBLE": "A TikTok, Instagram, Facebook, X or Snapchat post that can't be transcribed, refused when you send it: nothing is created or charged. `error.reason` says why: `link_not_verifiable` (private, deleted or not available in the region), `link_not_found` (the video can't be opened), `link_unsupported` (a kind of link that is not a video, such as a Facebook Page or profile), `link_no_media` (no audio or video, such as a photo post); `error.platform` names the site. Sending the same link again gives the same answer. Also returned at once for a Google Drive link while Google has paused downloads of your files (`error.reason` `drive_paused`): a Drive job of yours ended with Google's download limit, so new Drive links are refused until `error.paused_until` (24 hours later); upload the file instead. Other links that can't be downloaded fail later on `GET /v1/transcribe/{id}`.",
                   "DURATION_TOO_LONG": "A social post whose video is longer than 10 hours, refused when you send it (`error.platform` names the site). Nothing is created or charged.",
                   "INVALID_API_KEY": "Invalid or missing API key",
                   "API_KEY_REVOKED": "API key has been revoked",
@@ -5757,7 +6645,7 @@
                   "INTERNAL_ERROR": "Server error",
                   "LINK_CHECK_UNAVAILABLE": "A social post link could not be checked right now, so nothing was created or charged. `error.reason` `verify_rate_limited`: link checks are busy (`Retry-After: 600`); `link_check_failed`: the check did not answer (`Retry-After: 60`). Send the same request again after that many seconds. Links to files and to Google Drive, Dropbox or OneDrive are not checked and are not affected.",
                   "TEMPORARILY_UNAVAILABLE": "Your data could not be read just now (a brief problem on our side), so the request was not completed: nothing was created, changed or charged. Send the same request again after the number of seconds in the `Retry-After` header.",
-                  "MAINTENANCE": "The API is briefly paused for maintenance. Nothing was created or charged. Retry after the number of seconds in the `Retry-After` header.",
+                  "MAINTENANCE": "Paused for maintenance: nothing was created, changed or charged. `error.scope` says what is paused (`upload`: new jobs and uploads; `link`: a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) on `POST /v1/transcribe`, while uploads and other file addresses carry on; `global`: site-wide maintenance, which stops new jobs and uploads, or full maintenance, for example during a planned upgrade, when every operation gets this answer, reads included), and `error.status_url` is `GET /v1/status`, which needs no key and says what still works. Send the same request again after the number of seconds in the `Retry-After` header (300; when we set a time we expect the pause to end, `error.back_by` gives it and `Retry-After` counts down to it, from 60 to 3600 seconds).",
                   "ENDPOINT_REMOVED": "This endpoint has been removed. The `message` says what to use instead (for `POST /v1/accounts`: create the account at https://www.scriptivox.com/signup).",
                   "ISSUER_UNCONFIGURED": "OAuth sign-in is not configured on this deployment."
                 },
@@ -5838,6 +6726,26 @@
               "in_flight": {
                 "type": "integer",
                 "description": "On a 429 RATE_LIMIT_EXCEEDED for jobs in progress: how many of your jobs are in progress now."
+              },
+              "scope": {
+                "type": "string",
+                "description": "On a 503 MAINTENANCE: what is paused. `upload`: new jobs and uploads; `link`: a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) on POST /v1/transcribe, while uploads and other file addresses carry on; `global`: site-wide maintenance (new jobs and uploads) or full maintenance (every operation, reads included, for example during a planned upgrade). New values may be added. GET /v1/status names the same scopes, and its `still_working` tells the two `global` cases apart.",
+                "example": "upload"
+              },
+              "back_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "On a 503 MAINTENANCE: when we expect the pause to end, if we set a time (ISO 8601, UTC); otherwise null. `Retry-After` then counts the seconds until it (at least 60, at most 3600): sending the request again before then gets the same answer. GET /v1/status gives the same time.",
+                "example": "2026-11-20T14:30:00.000Z"
+              },
+              "status_url": {
+                "type": "string",
+                "format": "uri",
+                "description": "On a 503 MAINTENANCE: the address of GET /v1/status, which says what is paused, what still works and how long to wait. Needs no API key.",
+                "example": "https://api.scriptivox.com/v1/status"
               },
               "current_status": {
                 "type": "string",
@@ -6565,6 +7473,202 @@
           "errors": {
             "type": "object",
             "description": "The error envelope, and where the code list lives."
+          }
+        }
+      },
+      "ServiceStatus": {
+        "type": "object",
+        "title": "ServiceStatus",
+        "description": "What GET /v1/status returns. Every field is always present; the ones that cannot be known while `status` is `unknown` are null, never an empty list.",
+        "required": [
+          "status",
+          "accepting_new_jobs",
+          "maintenance",
+          "still_working",
+          "upcoming",
+          "checked_at",
+          "status_page"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "maintenance",
+              "unknown"
+            ],
+            "description": "`operational`: nothing that can stop an API call is paused. `maintenance`: something is paused, see `maintenance`. `unknown`: the state could not be checked just now; this does not mean the API is down."
+          },
+          "accepting_new_jobs": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether POST /v1/upload and POST /v1/transcribe take new jobs right now. Still true while only links to video sites are paused (scope `link`): uploads and file addresses are taken. null when `status` is `unknown`."
+          },
+          "maintenance": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "What is paused, when `status` is `maintenance`; otherwise null.",
+            "required": [
+              "paused",
+              "retry_after_seconds"
+            ],
+            "properties": {
+              "paused": {
+                "type": "array",
+                "description": "One entry per pause that stops an API call. Two can be on at once, each with its own message.",
+                "items": {
+                  "$ref": "#/components/schemas/ServiceStatusPause"
+                }
+              },
+              "retry_after_seconds": {
+                "type": "integer",
+                "description": "How long to wait before sending a paused request again: the same seconds as the `Retry-After` of its 503. With two pauses, the sooner of their waits."
+              }
+            }
+          },
+          "still_working": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Every operation still taking calls, as \"METHOD /path\" (reading, listing, cancelling and deleting jobs, the balance, webhooks and feedback are paused only by full maintenance, when this list is empty). An operation a pause stops only in part is listed here too: `POST /v1/transcribe` while only links to video sites are paused. Jobs already accepted always finish. null when `status` is `unknown`."
+          },
+          "upcoming": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ServiceStatusWindow"
+            },
+            "description": "Planned maintenance that has not started yet, soonest first (at most 5). Each one pauses new jobs from its start. null when the plan could not be read just now."
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the state was read. The answer can be a few seconds old, so this can be a little in the past."
+          },
+          "status_page": {
+            "type": "string",
+            "format": "uri",
+            "description": "The public status page, with uptime and incident history."
+          }
+        },
+        "example": {
+          "status": "maintenance",
+          "accepting_new_jobs": false,
+          "maintenance": {
+            "paused": [
+              {
+                "scope": "upload",
+                "name": "Starting new jobs and uploads",
+                "message": "Planned upgrade until 10:30 UTC.",
+                "routes": [
+                  "POST /v1/upload",
+                  "POST /v1/transcribe"
+                ],
+                "back_by": null
+              }
+            ],
+            "retry_after_seconds": 300
+          },
+          "still_working": [
+            "GET /v1/transcribe/{id}",
+            "DELETE /v1/transcribe/{id}",
+            "POST /v1/transcribe/{id}/cancel",
+            "POST /v1/transcribe/{id}/webhook/resend",
+            "POST /v1/webhooks/test",
+            "POST /v1/transcribe/{id}/feedback",
+            "GET /v1/transcriptions",
+            "GET /v1/balance"
+          ],
+          "upcoming": [],
+          "checked_at": "2026-11-20T14:02:11.000Z",
+          "status_page": "https://status.scriptivox.com"
+        }
+      },
+      "ServiceStatusPause": {
+        "type": "object",
+        "title": "ServiceStatusPause",
+        "description": "One pause that stops an API call.",
+        "required": [
+          "scope",
+          "name",
+          "message",
+          "routes",
+          "back_by"
+        ],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "What is paused, as a 503 MAINTENANCE names it in `error.scope`: `upload` (new jobs and uploads), `link` (a `url` to a video site on POST /v1/transcribe; uploads and other file addresses carry on) or `global` (site-wide maintenance, or full maintenance, which stops every operation: then `routes` names them all). New values may be added."
+          },
+          "name": {
+            "type": "string",
+            "description": "What is paused, in plain words."
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The message we wrote when we paused it, or null."
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The operations it stops, as \"METHOD /path\": wholly, or for scope `link` only the calls with a link to a video site (`name` says which; the operation then stays in `still_working`)."
+          },
+          "back_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When we expect this pause to end, if we set a time (ISO 8601, UTC); otherwise null. A time that has passed is never given. It is a plan: `status` says when the pause is really over."
+          }
+        }
+      },
+      "ServiceStatusWindow": {
+        "type": "object",
+        "title": "ServiceStatusWindow",
+        "description": "Planned maintenance that has not started yet.",
+        "required": [
+          "title",
+          "message",
+          "starts_at",
+          "ends_at"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "What the maintenance is."
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "More about it, or null."
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it starts. New jobs are paused from then."
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it is planned to end. Work can run over: `status` says when it is really over."
           }
         }
       },

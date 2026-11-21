@@ -49,6 +49,12 @@ CATEGORY_BY_STATUS = {
 }
 
 
+#: Codes whose class is written by hand in _exceptions.py because it reads extra fields of the
+#: ``error`` object (MaintenanceError: scope, status_url, back_by). The generated module imports and
+#: maps that class instead of writing its own.
+HAND_WRITTEN_BY_CODE = {"MAINTENANCE": "MaintenanceError"}
+
+
 def pretty(spec: Any) -> str:
     # Same bytes as the Node SDK's snapshot (JSON.stringify(spec, null, 2) + "\n").
     return json.dumps(spec, indent=2, ensure_ascii=False) + "\n"
@@ -228,8 +234,15 @@ def build_errors(spec: Dict[str, Any], spec_hash: str) -> str:
     used = set()
     classes: List[str] = []
     mapping: List[str] = []
+    for code in HAND_WRITTEN_BY_CODE:
+        if code not in codes:
+            raise SystemExit(f"HAND_WRITTEN_BY_CODE names {code}, which the document's error codes do not have")
     for code in codes:
         status = status_by_code[code]
+        if code in HAND_WRITTEN_BY_CODE:
+            used.add(HAND_WRITTEN_BY_CODE[code])
+            mapping.append(f'    "{code}": {HAND_WRITTEN_BY_CODE[code]},')
+            continue
         parent = CATEGORY_BY_STATUS.get(status) or ("InternalServerError" if status >= 500 else "APIError")
         used.add(parent)
         name = class_name_for_code(code)

@@ -5,6 +5,7 @@ import asyncio
 import io
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 import pytest
@@ -260,6 +261,165 @@ def test_locked_key_and_maintenance_are_retried(mock):
     mock.reply(api_error(503, "MAINTENANCE", headers={"retry-after": "0"}))
     with pytest.raises(MaintenanceError):
         mock.client(max_retries=0).balance()
+
+
+# ─── Service status (service status Phase 8) ─────────────────────────────────
+
+STATUS_URL = "https://api.scriptivox.com/v1/status"
+OPERATIONAL = {
+    "status": "operational",
+    "accepting_new_jobs": True,
+    "maintenance": None,
+    "still_working": ["POST /v1/upload", "POST /v1/transcribe", "GET /v1/balance"],
+    "upcoming": [],
+    "checked_at": "2026-11-21T10:00:00.000Z",
+    "status_page": "https://status.scriptivox.com",
+}
+UNKNOWN = {**OPERATIONAL, "status": "unknown", "accepting_new_jobs": None, "still_working": None, "upcoming": None}
+PAUSED = {
+    **OPERATIONAL,
+    "status": "maintenance",
+    "accepting_new_jobs": False,
+    "maintenance": {
+        "paused": [{"scope": "upload", "name": "New uploads and transcriptions", "message": "Planned upgrade.", "routes": ["POST /v1/upload", "POST /v1/transcribe"], "back_by": "2026-11-21T10:40:00.000Z"}],
+        "retry_after_seconds": 2400,
+    },
+    "still_working": ["GET /v1/balance"],
+}
+
+
+def maintenance_503(retry_after: str = "300", **extra):
+    fields = {"scope": "upload", "status_url": STATUS_URL, "back_by": None, **extra}
+    return api_error(503, "MAINTENANCE", "New uploads and transcriptions are briefly paused for maintenance.", headers={"retry-after": retry_after}, **fields)
+
+
+def test_client_status_sends_no_key_and_returns_the_body_as_sent(mock):
+    mock.reply(ok(PAUSED))
+    assert mock.client().status() == PAUSED
+    assert len(mock.requests) == 1
+    r = mock.requests[0]
+    assert (r.method, r.path) == ("GET", "/v1/status")
+    assert "authorization" not in r.headers, "no key is sent"
+    assert r.headers["user-agent"].startswith("scriptivox-python/")
+
+
+def test_status_function_needs_no_key_and_never_sends_authorization(monkeypatch, mock):
+    monkeypatch.delenv("SCRIPTIVOX_API_KEY", raising=False)
+    mock.reply(ok(OPERATIONAL))
+    s = scriptivox.status(
+        base_url=BASE + "/v1/",
+        http_client=httpx.Client(transport=httpx.MockTransport(mock.handler)),
+        default_headers={"authorization": "sk_live_should_not_go", "X-Trace": "t1"},
+    )
+    assert s == OPERATIONAL
+    r = mock.requests[0]
+    assert r.url == BASE + "/v1/status"
+    assert "authorization" not in r.headers
+    assert r.headers["x-trace"] == "t1"
+    monkeypatch.setenv("SCRIPTIVOX_BASE_URL", BASE)
+    mock.reply(ok(UNKNOWN))
+    u = scriptivox.status(http_client=httpx.Client(transport=httpx.MockTransport(mock.handler)))
+    assert u["status"] == "unknown"
+    assert u["accepting_new_jobs"] is None, '"could not check" stays None, never turned into True or False'
+    assert u["still_working"] is None
+
+
+def test_status_no_answer_raises_and_is_never_a_status(mock):
+    mock.reply("refused")
+    with pytest.raises(APIConnectionError):
+        scriptivox.status(base_url=BASE, max_retries=0, http_client=httpx.Client(transport=httpx.MockTransport(mock.handler)))
+    mock.requests.clear()
+    mock.reply(ok("Bad gateway", status=502), ok(OPERATIONAL))
+    s = scriptivox.status(base_url=BASE, max_retries=1, http_client=httpx.Client(transport=httpx.MockTransport(mock.handler)))
+    assert s["status"] == "operational", "a 5xx is retried like any safe GET"
+    assert len(mock.requests) == 2
+
+
+def test_async_status_client_and_function(monkeypatch, mock):
+    monkeypatch.delenv("SCRIPTIVOX_API_KEY", raising=False)
+    mock.reply(ok(PAUSED), ok(UNKNOWN))
+
+    async def run():
+        async with mock.aclient() as c:
+            a = await c.status()
+        b = await scriptivox.async_status(base_url=BASE, http_client=httpx.AsyncClient(transport=httpx.MockTransport(mock.ahandler)))
+        return a, b
+
+    a, b = asyncio.run(run())
+    assert a == PAUSED and b == UNKNOWN
+    assert all(r.path == "/v1/status" and "authorization" not in r.headers for r in mock.requests)
+
+
+def test_maintenance_error_fields_and_no_retry_at_300(mock):
+    mock.reply(maintenance_503())
+    with pytest.raises(MaintenanceError) as e:
+        mock.client().transcribe(url="https://example.com/a.mp3")
+    err = e.value
+    assert isinstance(err, ServiceUnavailableError) and isinstance(err, APIError)
+    assert (err.code, err.status) == ("MAINTENANCE", 503)
+    assert (err.scope, err.status_url, err.back_by, err.retry_after) == ("upload", STATUS_URL, None, 300)
+    assert len(mock.requests) == 1, "a 5-minute pause is not slept on inside the call"
+
+    mock.requests.clear()
+    mock.reply(maintenance_503("2400", scope="link", back_by="2026-11-21T10:40:00.000Z"))
+    with pytest.raises(MaintenanceError) as e:
+        mock.client().transcribe(url="https://www.tiktok.com/@a/video/1")
+    assert (e.value.scope, e.value.back_by, e.value.retry_after) == ("link", "2026-11-21T10:40:00.000Z", 2400)
+    assert len(mock.requests) == 1
+
+    mock.reply(api_error(503, "MAINTENANCE", "paused", headers={"retry-after": "300"}))
+    with pytest.raises(MaintenanceError) as e:
+        mock.client().balance()
+    assert (e.value.scope, e.value.status_url, e.value.back_by) == (None, None, None), "an answer without the fields"
+
+
+def test_maintenance_error_is_the_hand_written_class():
+    from scriptivox import _error_codes, _exceptions
+
+    assert ERROR_CLASS_BY_CODE["MAINTENANCE"] is MaintenanceError is _exceptions.MaintenanceError
+    assert "class MaintenanceError" not in Path(_error_codes.__file__).read_text(encoding="utf-8")
+    assert "MaintenanceError" in scriptivox.__all__
+
+
+def test_retry_delay_sleeps_60_seconds_of_maintenance_and_raises_longer():
+    from scriptivox import _common as c
+
+    def at(retry_after):
+        return MaintenanceError(status=503, code="MAINTENANCE", message="paused", retry_after=retry_after)
+
+    assert c.retry_delay_for(at(60), False, 0) == 60
+    assert c.retry_delay_for(at(61), False, 0) is None
+    assert c.retry_delay_for(at(300), True, 0) is None
+    assert c.retry_delay_for(at(3600), True, 0) is None
+
+
+def test_wait_rides_out_full_maintenance_then_keeps_polling(mock):
+    mock.reply(
+        job("w6", "processing"),
+        api_error(503, "MAINTENANCE", "Paused for a planned upgrade.", headers={"retry-after": "1"}, scope="global", status_url=STATUS_URL, back_by=None),
+        job("w6", "completed", result={"full_transcript": "ok"}),
+    )
+    assert mock.client(max_retries=0).wait("w6", poll_interval=0.01)["result"]["full_transcript"] == "ok"
+    assert mock.requests[2].at - mock.requests[1].at >= 0.95, "waited the Retry-After"
+    mock.requests.clear()
+    mock.reply(job("w7", "processing"), api_error(503, "MAINTENANCE", "Paused.", headers={"retry-after": "300"}, scope="global"))
+    with pytest.raises(MaintenanceError) as e:
+        mock.client(max_retries=0).wait("w7", poll_interval=0.01, timeout=2)
+    assert e.value.scope == "global", "a pause longer than the time left is raised"
+
+
+def test_async_wait_rides_out_full_maintenance(mock):
+    mock.reply(
+        job("w8", "processing"),
+        api_error(503, "MAINTENANCE", "Paused.", headers={"retry-after": "1"}, scope="global"),
+        job("w8", "completed", result={"full_transcript": "ok"}),
+    )
+
+    async def run():
+        async with mock.aclient(max_retries=0) as c:
+            return await c.wait("w8", poll_interval=0.01)
+
+    assert asyncio.run(run())["result"]["full_transcript"] == "ok"
 
 
 def test_wait_polls_until_completed(mock):
