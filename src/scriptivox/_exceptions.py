@@ -34,6 +34,7 @@ class APIError(ScriptivoxError):
         message: str,
         request_id: Optional[str] = None,
         docs_url: Optional[str] = None,
+        help_id: Optional[str] = None,
         retry_after: Optional[float] = None,
         error: Optional[Dict[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
@@ -48,7 +49,12 @@ class APIError(ScriptivoxError):
         self.message = message
         #: ``X-Request-Id`` / ``error.request_id`` (``req_`` + 16 hex). Quote it to support.
         self.request_id = request_id
+        #: ``error.docs_url``: the page that explains this exact error and what to do
+        #: (``https://www.scriptivox.com/errors/<help_id>``). An error with no page of its own links the error-codes table.
         self.docs_url = docs_url
+        #: ``error.help_id``: the id of that page, e.g. "api-no-balance". Stable (never renamed), often finer than
+        #: ``code``; None when the error has no page of its own. Branch on ``code``.
+        self.help_id = help_id
         #: Seconds from the ``Retry-After`` header, when the answer had one.
         self.retry_after = retry_after
         #: The whole ``error`` object (extra fields such as ``in_flight`` and ``limit`` live here).
@@ -199,6 +205,12 @@ class TranscriptionFailedError(ScriptivoxError):
         self.code: str = error.get("code") or "UNKNOWN_ERROR"
         self.transcription_id: str = transcription.get("id", "")
         self.transcription: Dict[str, Any] = dict(transcription)
+        #: The job's ``error.docs_url``: the page that explains why this job failed and what to do. None for a job
+        #: answered without one.
+        self.docs_url: Optional[str] = error.get("docs_url") if isinstance(error.get("docs_url"), str) else None
+        #: The job's ``error.help_id``, e.g. "drive-not-shared": often finer than ``code`` (that one is a
+        #: URL_NOT_ACCESSIBLE). Stable (never renamed). None for a job answered without one.
+        self.help_id: Optional[str] = error.get("help_id") if isinstance(error.get("help_id"), str) else None
         message = error.get("message") or "The transcription failed."
         super().__init__(f"Transcription {self.transcription_id} failed: {message} [{self.code}]")
 

@@ -4,7 +4,7 @@
     "title": "Scriptivox Transcription API",
     "version": "1.0.0",
     "summary": "Transcribe recorded audio and video into text with word-level timestamps and speaker labels.",
-    "description": "The Scriptivox API turns recorded audio and video into text. Submit a file by public URL (a file,\na Google Drive, Dropbox and OneDrive share link, or a TikTok, Instagram, Facebook, X or Snapchat post) or by\npresigned upload, poll for the result or receive a webhook, and read back a structured transcript\nwith per-utterance and per-word timestamps, optional speaker diarization, and SRT/WebVTT/plain-text\nexports.\n\n**When to use it.** Batch or on-demand transcription of *recorded* media: meeting and interview\nrecordings, podcasts, lecture capture, call archives, video libraries that need captions, and\npipelines that need word-level timestamps for clip search. 119 languages. It is not a live\nstreaming or real-time dictation API — every job takes a complete file.\n\n**Shape of an integration.** `POST /v1/transcribe` returns immediately with `status: \"created\"`;\nthe file is downloaded and validated in the background, so input errors surface later on\n`GET /v1/transcribe/{id}` with `status: \"failed\"`, not on the submit call. A correct client must\nhandle failures on the poll path. The one exception is a social post link: it is checked on the\nsubmit call (a few seconds), and a post that cannot be transcribed is refused there with a 400.\n\n**Limits.** 5 GB per file, 1 second to 10 hours of audio, 26 accepted file formats. Source\naudio is deleted 24 hours after the job ends; transcripts stay retrievable.\n\n**Billing.** $0.20 per hour of audio, pay as you go. Cost is reserved once the duration is known\n(after download or validation), not at submit time. Failed and cancelled jobs are free — the\nreservation is released.\n\n**Errors.** Every error response is `{\"error\": {\"code\", \"message\"}}` with a machine-readable code.\nSee https://platform.scriptivox.com/docs/api-reference#error-codes.\n\n**Support.** Email support@scriptivox.com with the account email, the job id, when it happened\n(with time zone) and the exact error code and message; never an API key. Any feedback or issue\nsent to support, by email or any other channel, is resolved within 24 hours. This is our founders'\npersonal guarantee.",
+    "description": "The Scriptivox API turns recorded audio and video into text. Submit a file by public URL (a file,\na Google Drive, Dropbox and OneDrive share link, or a TikTok, Instagram, Facebook, X or Snapchat post) or by\npresigned upload, poll for the result or receive a webhook, and read back a structured transcript\nwith per-utterance and per-word timestamps, optional speaker diarization, and SRT/WebVTT/plain-text\nexports.\n\n**When to use it.** Batch or on-demand transcription of *recorded* media: meeting and interview\nrecordings, podcasts, lecture capture, call archives, video libraries that need captions, and\npipelines that need word-level timestamps for clip search. 119 languages. It is not a live\nstreaming or real-time dictation API — every job takes a complete file.\n\n**Shape of an integration.** `POST /v1/transcribe` returns immediately with `status: \"created\"`;\nthe file is downloaded and validated in the background, so input errors surface later on\n`GET /v1/transcribe/{id}` with `status: \"failed\"`, not on the submit call. A correct client must\nhandle failures on the poll path. The one exception is a social post link: it is checked on the\nsubmit call (a few seconds), and a post that cannot be transcribed is refused there with a 400.\n\n**Limits.** 5 GB per file, 1 second to 10 hours of audio, 26 accepted file formats. Source\naudio is deleted 24 hours after the job ends; transcripts stay retrievable.\n\n**Billing.** $0.20 per hour of audio, pay as you go. Cost is reserved once the duration is known\n(after download or validation), not at submit time. Failed and cancelled jobs are free — the\nreservation is released.\n\n**Errors.** Every error response is `{\"error\": {\"code\", \"message\", \"docs_url\", \"help_id\"}}` with a machine-readable code;\n`docs_url` is the page that explains that exact error and what to do (https://www.scriptivox.com/errors), and a failed\njob's `error` carries the same two fields. See https://platform.scriptivox.com/docs/api-reference#error-codes.\n\n**Support.** Email support@scriptivox.com with the account email, the job id, when it happened\n(with time zone) and the exact error code and message; never an API key. Any feedback or issue\nsent to support, by email or any other channel, is resolved within 24 hours. This is our founders'\npersonal guarantee.",
     "termsOfService": "https://www.scriptivox.com/termsofuse",
     "contact": {
       "name": "Scriptivox API support",
@@ -1293,7 +1293,8 @@
                         "scope": "upload",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -1307,7 +1308,8 @@
                         "scope": "upload",
                         "back_by": "2026-11-20T14:30:00.000Z",
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -1321,7 +1323,8 @@
                         "scope": "global",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2098,7 +2101,8 @@
                         "message": "Link checks are busy right now. Please wait a few minutes and try again.",
                         "reason": "verify_rate_limited",
                         "platform": "instagram",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/link-check-unavailable",
+                        "help_id": "link-check-unavailable",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2112,7 +2116,8 @@
                         "scope": "upload",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2126,7 +2131,8 @@
                         "scope": "upload",
                         "back_by": "2026-11-20T14:30:00.000Z",
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2140,7 +2146,8 @@
                         "scope": "link",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2154,7 +2161,8 @@
                         "scope": "global",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2773,7 +2781,8 @@
                       "error": {
                         "code": "TEMPORARILY_UNAVAILABLE",
                         "message": "The transcription could not be read just now (a brief problem on our side). Nothing was changed. Send the same request again in 5 seconds.",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/try-again-shortly",
+                        "help_id": "try-again-shortly",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2787,7 +2796,8 @@
                         "scope": "global",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -3256,7 +3266,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -3353,7 +3364,9 @@
                   "status": "failed",
                   "error": {
                     "code": "CANCELLED",
-                    "message": "Cancelled by customer"
+                    "message": "Cancelled by customer",
+                    "docs_url": "https://www.scriptivox.com/errors/job-cancelled",
+                    "help_id": "job-cancelled"
                   },
                   "released_cents": 0
                 }
@@ -3741,7 +3754,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -4281,7 +4295,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -4836,7 +4851,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -5274,7 +5290,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -5752,7 +5769,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -6127,7 +6145,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -6369,7 +6388,9 @@
                 "status": "failed",
                 "error": {
                   "code": "URL_NOT_ACCESSIBLE",
-                  "message": "The URL could not be downloaded."
+                  "message": "The URL could not be downloaded.",
+                  "docs_url": "https://www.scriptivox.com/errors/link-not-accessible",
+                  "help_id": "link-not-accessible"
                 }
               }
             }
@@ -6565,7 +6586,7 @@
       "Error": {
         "type": "object",
         "title": "Error",
-        "description": "Every failed request returns this shape. `code` is stable and machine-readable; `message` is a sanitized, customer-safe string and never a raw stack trace; `request_id` identifies the request for support.",
+        "description": "Every failed request returns this shape. `code` is stable and machine-readable; `message` is a sanitized, customer-safe string and never a raw stack trace; `docs_url` is the page that explains this exact error and what to do, and `help_id` is that page's id; `request_id` identifies the request for support.",
         "required": [
           "error"
         ],
@@ -6682,6 +6703,40 @@
                   "MAINTENANCE": 503,
                   "ENDPOINT_REMOVED": 410,
                   "ISSUER_UNCONFIGURED": 503
+                },
+                "x-helpUrlByCode": {
+                  "INVALID_REQUEST": "https://www.scriptivox.com/errors/request-invalid",
+                  "INVALID_FILENAME": "https://www.scriptivox.com/errors/filename-invalid",
+                  "INVALID_MEDIA_FORMAT": "https://www.scriptivox.com/errors/file-type-not-supported",
+                  "FILE_NOT_UPLOADED": "https://www.scriptivox.com/errors/upload-never-arrived",
+                  "FILE_TOO_LARGE": "https://www.scriptivox.com/errors/file-too-large",
+                  "UPLOAD_ALREADY_USED": "https://www.scriptivox.com/errors/upload-already-used",
+                  "UPLOAD_EXPIRED": "https://www.scriptivox.com/errors/upload-expired",
+                  "URL_NOT_ACCESSIBLE": "https://www.scriptivox.com/errors/link-not-accessible",
+                  "DURATION_TOO_LONG": "https://www.scriptivox.com/errors/file-too-long",
+                  "INVALID_API_KEY": "https://www.scriptivox.com/errors/api-key-invalid",
+                  "API_KEY_REVOKED": "https://www.scriptivox.com/errors/api-key-revoked",
+                  "INSUFFICIENT_BALANCE": "https://www.scriptivox.com/errors/api-balance-too-low",
+                  "ZERO_BALANCE": "https://www.scriptivox.com/errors/api-no-balance",
+                  "UPLOAD_NOT_FOUND": "https://www.scriptivox.com/errors/upload-not-found",
+                  "TRANSCRIPTION_NOT_FOUND": "https://www.scriptivox.com/errors/transcript-not-found",
+                  "NOT_FOUND": "https://www.scriptivox.com/errors/endpoint-not-found",
+                  "FORBIDDEN": "https://www.scriptivox.com/errors/request-blocked",
+                  "METHOD_NOT_ALLOWED": "https://www.scriptivox.com/errors/method-not-allowed",
+                  "CONFLICT": "https://www.scriptivox.com/errors/action-not-allowed-now",
+                  "PAYLOAD_TOO_LARGE": "https://www.scriptivox.com/errors/request-body-too-large",
+                  "UNSUPPORTED_MEDIA_TYPE": "https://www.scriptivox.com/errors/request-not-json",
+                  "IDEMPOTENCY_KEY_LOCKED": "https://www.scriptivox.com/errors/request-in-progress",
+                  "SOURCE_EXPIRED": "https://www.scriptivox.com/errors/original-file-gone",
+                  "IDEMPOTENCY_KEY_CONFLICT": "https://www.scriptivox.com/errors/request-key-reused",
+                  "NO_SPEECH": "https://www.scriptivox.com/errors/no-speech-again",
+                  "RATE_LIMIT_EXCEEDED": "https://www.scriptivox.com/errors/rate-limited",
+                  "INTERNAL_ERROR": "https://www.scriptivox.com/errors/something-went-wrong",
+                  "LINK_CHECK_UNAVAILABLE": "https://www.scriptivox.com/errors/link-check-unavailable",
+                  "TEMPORARILY_UNAVAILABLE": "https://www.scriptivox.com/errors/try-again-shortly",
+                  "MAINTENANCE": "https://www.scriptivox.com/errors/maintenance",
+                  "ENDPOINT_REMOVED": "https://www.scriptivox.com/errors/endpoint-removed",
+                  "ISSUER_UNCONFIGURED": "https://www.scriptivox.com/errors/sign-in-not-configured"
                 }
               },
               "message": {
@@ -6691,7 +6746,14 @@
               "docs_url": {
                 "type": "string",
                 "format": "uri",
-                "description": "Documentation for this error code."
+                "description": "The page that explains this exact error, why it happens and what to do: `https://www.scriptivox.com/errors/{help_id}`. Often finer than the code: one code can have several pages (an `INVALID_REQUEST` for an export of an unfinished job links \"The transcript is not ready yet\", `https://www.scriptivox.com/errors/transcript-not-ready`). An error with no page of its own links the error-codes table (https://platform.scriptivox.com/docs/api-reference#error-codes) and has no `help_id`.",
+                "example": "https://www.scriptivox.com/errors/api-key-invalid"
+              },
+              "help_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "The id of the help page in `docs_url`. Stable: an id is never renamed, so code can keep its own text or handling per id. The pages are listed at https://www.scriptivox.com/errors and, as JSON, https://www.scriptivox.com/errors.json; each also has a plain-text copy at `https://www.scriptivox.com/errors/{help_id}.md`. New ids may be added. Branch on `code`; use `help_id` for more detail than the code gives.",
+                "example": "api-key-invalid"
               },
               "request_id": {
                 "type": "string",
@@ -6769,7 +6831,8 @@
           "error": {
             "code": "INVALID_API_KEY",
             "message": "Missing API key. Provide via Authorization header or x-api-key header.",
-            "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+            "docs_url": "https://www.scriptivox.com/errors/api-key-invalid",
+            "help_id": "api-key-invalid",
             "request_id": "req_8f3a1c2b9d4e6f70"
           }
         }
@@ -7106,7 +7169,7 @@
             "x-enumDescriptions": {
               "URL_NOT_ACCESSIBLE": "URL flow only. Covers several non-fetchable cases: the URL returned 4xx/5xx; DNS didn't resolve; the connection was refused; the response was an HTML page instead of media (login/preview/folder/expired-link, or a video site's page instead of its video); the share requires sign-in (e.g. OneDrive `1drv.ms/v/c/…` SharePoint Photos shares); or the server returned a 200 with an empty body. For a social post that passed the check: its video file could not be downloaded, or the download links the site gave expired before the download and checking the post again did not give working ones. The `message` field names the specific cause when detectable.",
               "DOWNLOAD_FAILED": "URL flow only: the download started but was interrupted.",
-              "INVALID_MEDIA_FORMAT": "The file downloaded but could not be read: not actually audio/video, no audio track, or **shorter than the 1-second minimum** (message names the measured duration, e.g. `\"Audio too short (0.10s). Minimum duration is 1 second.\"`).",
+              "INVALID_MEDIA_FORMAT": "The file downloaded but could not be read: not actually audio/video, no audio track, or **shorter than the 1-second minimum** (message names the measured duration, e.g. `\"Audio too short (0.10s). Minimum duration is 1 second.\"`). The length is measured in whole seconds, rounded: audio of half a second or more counts as 1 second and is transcribed and billed as 1 second.",
               "FILE_TOO_LARGE": "The file is larger than 5 GB. For a URL this is only known once the download reaches the limit.",
               "DURATION_TOO_LONG": "Audio exceeds the 10-hour limit (only known after probing duration).",
               "INSUFFICIENT_BALANCE": "Once the length was measured, the job cost more than your available balance. Nothing was charged. The `message` names the amount needed; add funds and submit again.",
@@ -7118,11 +7181,39 @@
               "BILLING_ERROR": "Internal accounting issue while finalizing the charge. Your balance was **not** debited and the transcript was not delivered. Safe to retry.",
               "INTERNAL_ERROR": "A server-side step (e.g. queueing the job to our processing layer) failed after we accepted the request. Safe to retry.",
               "CANCELLED": "The transcription was cancelled by the customer via `POST /v1/transcribe/{id}/cancel`. You are not charged."
+            },
+            "x-helpUrlByCode": {
+              "URL_NOT_ACCESSIBLE": "https://www.scriptivox.com/errors/link-not-accessible",
+              "DOWNLOAD_FAILED": "https://www.scriptivox.com/errors/link-download-interrupted",
+              "INVALID_MEDIA_FORMAT": "https://www.scriptivox.com/errors/file-type-not-supported",
+              "FILE_TOO_LARGE": "https://www.scriptivox.com/errors/file-too-large",
+              "DURATION_TOO_LONG": "https://www.scriptivox.com/errors/file-too-long",
+              "INSUFFICIENT_BALANCE": "https://www.scriptivox.com/errors/api-balance-too-low",
+              "PROCESSING_ERROR": "https://www.scriptivox.com/errors/processing-failed",
+              "SPEECH_BELOW_THRESHOLD": "https://www.scriptivox.com/errors/speech-below-threshold",
+              "CREATED_TIMEOUT": "https://www.scriptivox.com/errors/job-start-failed",
+              "DOWNLOAD_TIMEOUT": "https://www.scriptivox.com/errors/link-download-timed-out",
+              "PROCESSING_TIMEOUT": "https://www.scriptivox.com/errors/processing-timed-out",
+              "BILLING_ERROR": "https://www.scriptivox.com/errors/charge-not-completed",
+              "INTERNAL_ERROR": "https://www.scriptivox.com/errors/something-went-wrong",
+              "CANCELLED": "https://www.scriptivox.com/errors/job-cancelled"
             }
           },
           "message": {
             "type": "string",
             "description": "Human-readable explanation. Wording may change between releases."
+          },
+          "docs_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The page that explains why this job failed and what to do: `https://www.scriptivox.com/errors/{help_id}`. Found from the job's own failure, so it is often finer than the code: a `URL_NOT_ACCESSIBLE` job whose Google Drive file is not shared links \"https://www.scriptivox.com/errors/drive-not-shared\", not the general page of that code. On the job, in the list and in the transcription.failed webhook.",
+            "example": "https://www.scriptivox.com/errors/drive-not-shared"
+          },
+          "help_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The id of the help page in `docs_url`. Stable: an id is never renamed. Pages: https://www.scriptivox.com/errors (JSON: https://www.scriptivox.com/errors.json; plain text: `https://www.scriptivox.com/errors/{help_id}.md`). New ids may be added. Branch on `code`; use `help_id` for more detail than the code gives.",
+            "example": "drive-not-shared"
           }
         }
       },

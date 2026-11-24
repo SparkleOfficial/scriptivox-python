@@ -105,6 +105,7 @@ def error_from_response(status: int, text: str, headers: Mapping[str, str]) -> A
         message=message,
         request_id=request_id,
         docs_url=error.get("docs_url") if error and isinstance(error.get("docs_url"), str) else None,
+        help_id=error.get("help_id") if error and isinstance(error.get("help_id"), str) else None,
         retry_after=retry_after,
         error=error,
         headers=lower,

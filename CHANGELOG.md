@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Every error links its help page: `APIError.help_id` (new) next to `docs_url`, which now names the page that explains that exact error (`https://www.scriptivox.com/errors/<help_id>`) instead of the error-codes table; `TranscriptionFailedError.docs_url` and `.help_id` (new) from the failed job's `error`.
+- Regenerated from the API document: `help_id` on every error (`ErrorDetail`), `docs_url` and `help_id` on a job's `error` (`TranscriptionError`, the `transcription.failed` webhook), each code's help page (`x-helpUrlByCode`), and the minimum length explained (a file of half a second or more counts as 1 second).
+
 ## 0.4.0
 
 - `status()`: whether the API is taking new jobs right now (GET /v1/status), what is paused for maintenance and why, what still works, how long to wait and planned maintenance ahead. It needs no API key: call `client.status()` (sync and async), or `scriptivox.status()` / `await scriptivox.async_status()` with no client at all. Typed as `ServiceStatus`. If the call gets no answer it raises; it never reports "all fine" from a failed call.

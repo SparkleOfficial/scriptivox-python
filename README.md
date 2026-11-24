@@ -167,6 +167,8 @@ except APIError as e:
 
 The full list of codes is in the [API reference](https://platform.scriptivox.com/docs/api-reference#error-codes).
 
+Every error links the page that explains it: `e.docs_url` (for example `https://www.scriptivox.com/errors/api-no-balance`) and `e.help_id`, that page's id. A `TranscriptionFailedError` has both too, from the job's own failure, so they are often finer than the code (a `URL_NOT_ACCESSIBLE` job whose Google Drive file is not shared has `help_id` `"drive-not-shared"`). Branch on `code`; show or log `docs_url` for the person who has to fix it. `help_id` is None when an error has no page of its own.
+
 ## Maintenance
 
 Now and then part of the API is paused for maintenance. A paused request answers `503 MAINTENANCE` and the SDK raises `MaintenanceError`: nothing was created or charged, so send the same request again later. Jobs already accepted always finish.

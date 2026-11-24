@@ -195,6 +195,7 @@ def test_typed_errors(mock):
     assert isinstance(err, PaymentRequiredError) and isinstance(err, APIError) and isinstance(err, ScriptivoxError)
     assert (err.status, err.code, err.request_id) == (402, "ZERO_BALANCE", "req_0123456789abcdef")
     assert err.docs_url == "https://platform.scriptivox.com/docs/api-reference#error-codes"
+    assert err.help_id is None  # an error without help_id (the table link)
     assert re.search(r"deposit funds.*\[ZERO_BALANCE, request req_0123456789abcdef\]", str(err))
     assert err.message.startswith("Balance is $0")
     assert len(mock.requests) == 1
@@ -432,12 +433,38 @@ def test_wait_polls_until_completed(mock):
     assert gaps[0] >= 0.015 and gaps[2] >= 0.035
 
 
+def test_error_with_its_own_help_page(mock):
+    mock.reply(api_error(402, "ZERO_BALANCE", "No balance found. Please deposit funds first.",
+                         docs_url="https://www.scriptivox.com/errors/api-no-balance", help_id="api-no-balance"))
+    with pytest.raises(ZeroBalanceError) as e:
+        mock.client().transcribe(url="https://example.com/a.mp3")
+    assert e.value.docs_url == "https://www.scriptivox.com/errors/api-no-balance"
+    assert e.value.help_id == "api-no-balance"
+    assert e.value.error["help_id"] == "api-no-balance" and e.value.code == "ZERO_BALANCE"
+
+
+def test_wait_failed_has_the_jobs_help_page(mock):
+    mock.reply(job("w4", "failed", error={
+        "code": "URL_NOT_ACCESSIBLE",
+        "message": 'Google Drive could not find this file, or it is not shared with "Anyone with the link". Share it with "Anyone with the link" and try again, or upload the file.',
+        "docs_url": "https://www.scriptivox.com/errors/drive-not-shared",
+        "help_id": "drive-not-shared",
+    }))
+    with pytest.raises(TranscriptionFailedError) as e:
+        mock.client().wait("w4")
+    assert e.value.code == "URL_NOT_ACCESSIBLE"
+    assert e.value.docs_url == "https://www.scriptivox.com/errors/drive-not-shared"
+    assert e.value.help_id == "drive-not-shared"
+
+
 def test_wait_failed_raises(mock):
     mock.reply(job("w2", "failed", error={"code": "URL_NOT_ACCESSIBLE", "message": "The URL could not be fetched (HTTP 403)."}))
     with pytest.raises(TranscriptionFailedError) as e:
         mock.client().wait("w2")
     assert e.value.code == "URL_NOT_ACCESSIBLE" and e.value.transcription_id == "w2"
     assert "HTTP 403" in str(e.value)
+    # A job answered without the fields (before the API had them).
+    assert e.value.docs_url is None and e.value.help_id is None
 
 
 def test_wait_timeout(mock):
