@@ -115,6 +115,7 @@ class Scriptivox:
         timeout: Optional[float] = None,
         max_retries: Optional[int] = None,
         auth: bool = True,
+        with_headers: bool = False,
     ) -> Any:
         retries = self.max_retries if max_retries is None else max_retries
         headers: Dict[str, str] = {
@@ -149,6 +150,17 @@ class Scriptivox:
                 err.__cause__ = exc
             else:
                 if response.is_success:
+                    if with_headers:  # wait(): the parsed body and the answer's headers (Retry-After)
+                        try:
+                            return (response.json() if response.content else None), response.headers
+                        except ValueError:
+                            raise APIError(
+                                status=response.status_code,
+                                code="INVALID_RESPONSE",
+                                message=f"The API answered {method} {path} with a body that is not JSON.",
+                                request_id=response.headers.get("x-request-id"),
+                                headers=response.headers,
+                            ) from None
                     if text:
                         return response.text
                     if not response.content:
@@ -371,18 +383,24 @@ class Scriptivox:
         *,
         timeout: float = c.DEFAULT_WAIT_TIMEOUT,
         poll_interval: float = c.DEFAULT_POLL_INTERVAL,
-        max_poll_interval: float = c.DEFAULT_MAX_POLL_INTERVAL,
+        max_poll_interval: Optional[float] = None,
         on_poll: Optional[Any] = None,
     ) -> Transcription:
         """Poll until the job ends and return it completed. A failed job raises TranscriptionFailedError
-        (its ``code`` is the job's error.code). The wait between polls starts at 2 s and grows to 10 s;
-        a 429, or a MaintenanceError while reads are paused (the job carries on), waits out its Retry-After
-        when that fits in the timeout. ``timeout`` is in seconds (default 2 hours)."""
+        (its ``code`` is the job's error.code). The wait between polls starts at 2 s and grows to 10 s
+        (``max_poll_interval``, default 10); when the API answers an unfinished job with a longer
+        Retry-After (up to 60 s), the next poll waits that long instead (never longer than a
+        ``max_poll_interval`` you set). A 429, or a MaintenanceError while reads are paused (the job
+        carries on), waits out its Retry-After when that fits in the timeout. ``timeout`` is in seconds
+        (default 2 hours)."""
         deadline = c.monotonic() + timeout
-        interval = min(poll_interval, max_poll_interval)
+        max_interval = c.DEFAULT_MAX_POLL_INTERVAL if max_poll_interval is None else max_poll_interval
+        interval = min(poll_interval, max_interval)
         while True:
             try:
-                job: Transcription = self.get(transcription_id)
+                job, answer_headers = self._send(
+                    "GET", f"/v1/transcribe/{c.path_id(transcription_id)}", idempotent=True, with_headers=True
+                )
             except (RateLimitError, MaintenanceError) as exc:
                 # A rate limit, or full maintenance (reads paused for a few minutes while the job carries
                 # on): wait out the Retry-After and poll again, as long as that fits before the deadline.
@@ -396,10 +414,11 @@ class Scriptivox:
                 return job
             if job["status"] == "failed":
                 raise TranscriptionFailedError(job)
-            if c.monotonic() + interval > deadline:
+            delay = c.next_poll_delay(c.parse_retry_after(answer_headers.get("retry-after")), interval, max_poll_interval)
+            if c.monotonic() + delay > deadline:
                 raise WaitTimeoutError(job, timeout)
-            time.sleep(interval)
-            interval = min(interval * 1.5, max_poll_interval)
+            time.sleep(delay)
+            interval = min(interval * 1.5, max_interval)
 
     def list_page(
         self,

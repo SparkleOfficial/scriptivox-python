@@ -453,6 +453,58 @@ def test_wait_honours_retry_after(mock):
     assert mock.requests[2].at - mock.requests[1].at >= 0.95
 
 
+def _ra(id: str, status: str, seconds: str) -> httpx.Response:
+    return ok({"id": id, "status": status}, headers={"retry-after": seconds})
+
+
+def test_wait_follows_an_unfinished_jobs_retry_after(mock):
+    # Database efficiency Phase 24: poll_interval 20 ms, so without the header the polls would come 20 and 30 ms apart.
+    mock.reply(_ra("w9", "created", "1"), _ra("w9", "processing", "1"), job("w9", "completed", result={"full_transcript": "ok"}))
+    assert mock.client().wait("w9", poll_interval=0.02)["result"]["full_transcript"] == "ok"
+    gaps = [b.at - a.at for a, b in zip(mock.requests, mock.requests[1:])]
+    assert all(0.95 <= g < 2.5 for g in gaps), gaps
+
+
+def test_wait_never_sooner_than_its_interval_and_capped(mock):
+    from scriptivox import _common as c
+
+    mock.reply(_ra("w10", "processing", "0"), job("w10", "completed", result={"full_transcript": "ok"}))
+    mock.client().wait("w10", poll_interval=0.3)
+    assert mock.requests[1].at - mock.requests[0].at >= 0.28
+    mock.requests.clear()
+    mock.reply(_ra("w10b", "processing", "20"), job("w10b", "completed", result={"full_transcript": "ok"}))
+    mock.client().wait("w10b", max_poll_interval=0.1)
+    gap = mock.requests[1].at - mock.requests[0].at
+    assert 0.09 <= gap < 1.0, gap
+    assert c.next_poll_delay(20, 2, None) == 20
+    assert c.next_poll_delay(3, 2, None) == 3
+    assert c.next_poll_delay(3, 10, None) == 10
+    assert c.next_poll_delay(0, 2, None) == 2
+    assert c.next_poll_delay(900, 2, None) == 60
+    assert c.next_poll_delay(20, 2, 5) == 5
+    assert c.next_poll_delay(None, 4.5, None) == 4.5
+    assert c.next_poll_delay(float("nan"), 4.5, None) == 4.5
+
+
+def test_wait_retry_after_beyond_the_deadline_times_out(mock):
+    mock.always(_ra("w11", "processing", "20"))
+    with pytest.raises(WaitTimeoutError):
+        mock.client().wait("w11", timeout=1)
+    assert len(mock.requests) == 1
+
+
+def test_async_wait_follows_retry_after(mock):
+    mock.reply(_ra("w12", "pending", "1"), job("w12", "completed", result={"full_transcript": "ok"}))
+
+    async def run():
+        async with mock.aclient() as c:
+            return await c.wait("w12", poll_interval=0.02)
+
+    assert asyncio.run(run())["result"]["full_transcript"] == "ok"
+    gap = mock.requests[1].at - mock.requests[0].at
+    assert 0.95 <= gap < 2.5, gap
+
+
 def test_get_json_and_exports(mock):
     c = mock.client()
     mock.reply(job("g1", "completed", result={"full_transcript": "x"}))

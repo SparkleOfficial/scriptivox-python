@@ -77,7 +77,7 @@ except SourceExpiredError:
 
 ## Waiting
 
-`wait(id)` polls until the job ends. It waits 2 s between polls at first, growing to 10 s, and honours `Retry-After` when rate-limited. It returns the completed job. A job that fails raises `TranscriptionFailedError`, whose `code` is the job's `error.code`:
+`wait(id)` polls until the job ends. It waits 2 s between polls at first, growing to 10 s, and longer when a check of an unfinished job answers with a longer `Retry-After` (up to 60 s). It also honours `Retry-After` when rate-limited. It returns the completed job. A job that fails raises `TranscriptionFailedError`, whose `code` is the job's `error.code`:
 
 ```python
 from scriptivox import TranscriptionFailedError

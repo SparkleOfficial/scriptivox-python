@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- `wait()` follows the API's `Retry-After` on an unfinished job: when a status check answers with one longer than the client's own growing interval (2 s up to 10 s), the next check waits that long instead (up to 60 s), so a long file is checked less often. It never checks sooner or more often than before. A `max_poll_interval` you set still caps the wait. Without the header (older API answers) `wait()` polls as before.
+
 ## 0.4.0
 
 - `status()`: whether the API is taking new jobs right now (GET /v1/status), what is paused for maintenance and why, what still works, how long to wait and planned maintenance ahead. It needs no API key: call `client.status()` (sync and async), or `scriptivox.status()` / `await scriptivox.async_status()` with no client at all. Typed as `ServiceStatus`. If the call gets no answer it raises; it never reports "all fine" from a failed call.
