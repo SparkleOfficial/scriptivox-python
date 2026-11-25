@@ -725,3 +725,15 @@ def test_generated_types_resolve_at_runtime():
             checked += 1
     assert checked >= 25
     assert typing.get_type_hints(_types.WebhookTest)["test"] == typing.Literal[True]
+
+
+def test_waiting_and_not_started_types():
+    """Wait reasons (24 Nov 2026): `waiting` on a job and its list item, `not_started` on an accepted job."""
+    import typing
+
+    from scriptivox import NotStarted, TranscriptionSummary, TranscriptionWaiting
+
+    assert typing.get_type_hints(TranscriptionSummary)["waiting"] is TranscriptionWaiting
+    assert set(typing.get_type_hints(TranscriptionWaiting)) == {"reason", "since", "retry_at"}
+    assert set(typing.get_type_hints(NotStarted)) == {"total", "google_drive"}
+    assert "TranscriptionWaiting" in scriptivox.__all__ and "NotStarted" in scriptivox.__all__

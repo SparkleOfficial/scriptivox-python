@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- `waiting` on a job (`get()`, `list()`, and what `wait()`'s `on_poll` sees) while it waits for its turn or for a later try at a Google Drive link: `reason` (`account_drive_limit`, `account_download_limit`, `busy`, `drive_retry`; new values may come), `since` and `retry_at`, with `progress` saying why in a sentence. The status keeps its value. Typed as `TranscriptionWaiting`.
+- `not_started` on `transcribe()`'s answer and on the in-progress `RateLimitExceededError`: how many of the account's jobs had not started yet, and how many of them are Google Drive links. Typed as `NotStarted`.
+- Regenerated from the API document: the above, the `pending` status described, and the feedback call's `report_no_speech`, `already_reported` and `no_speech_reported`.
+
 ## 0.5.0
 
 - `wait()` follows the API's `Retry-After` on an unfinished job: when a status check answers with one longer than the client's own growing interval (2 s up to 10 s), the next check waits that long instead (up to 60 s), so a long file is checked less often. It never checks sooner or more often than before. A `max_poll_interval` you set still caps the wait. Without the header (older API answers) `wait()` polls as before.

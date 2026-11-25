@@ -1925,7 +1925,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded (RATE_LIMIT_EXCEEDED). Limits use a sliding 60-second window, per API key per endpoint, plus a 300/min per-IP cap across all endpoints. `Retry-After` and `RateLimit-Policy` are always present; `RateLimit` and `X-RateLimit-Remaining` are present when the per-key limiter is what rejected the request, and absent when the per-IP cap or an abuse block rejected it before the key was read. Also RATE_LIMIT_EXCEEDED: 25 jobs already in progress on this account (`error.in_flight` and `error.limit`; wait for some to finish); or, for a social post link, a limit on social links set on your account (`error.reason` social_link_limit, `error.limit`, `error.window_seconds`, and the `Retry-After` header; accounts have none unless Scriptivox sets one), which uploads and other links do not count toward. Neither has `retry_after` in the body.",
+            "description": "Rate limit exceeded (RATE_LIMIT_EXCEEDED). Limits use a sliding 60-second window, per API key per endpoint, plus a 300/min per-IP cap across all endpoints. `Retry-After` and `RateLimit-Policy` are always present; `RateLimit` and `X-RateLimit-Remaining` are present when the per-key limiter is what rejected the request, and absent when the per-IP cap or an abuse block rejected it before the key was read. Also RATE_LIMIT_EXCEEDED: 25 jobs already in progress on this account (`error.in_flight`, `error.limit` and `error.not_started`; wait for some to finish); or, for a social post link, a limit on social links set on your account (`error.reason` social_link_limit, `error.limit`, `error.window_seconds`, and the `Retry-After` header; accounts have none unless Scriptivox sets one), which uploads and other links do not count toward. Neither has `retry_after` in the body.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -2177,7 +2177,7 @@
           "Transcriptions"
         ],
         "summary": "Get a transcription",
-        "description": "Returns the status and, once complete, the transcript. Poll until status is \"completed\" or \"failed\", or configure a webhook instead. The status lifecycle is created -> downloading (URL flow only) -> processing -> completed | failed. When status is \"failed\", `error.code` names the cause. Pass ?format=srt|vtt|text to export captions or plain text directly instead of JSON.",
+        "description": "Returns the status and, once complete, the transcript. Poll until status is \"completed\" or \"failed\", or configure a webhook instead. The status lifecycle is created -> downloading (URL flow only) -> processing -> completed | failed. When status is \"failed\", `error.code` names the cause. While a job waits for its turn (or for a later try at a Google Drive link), `waiting` says why and `progress` says it in a sentence; the status keeps its value. Pass ?format=srt|vtt|text to export captions or plain text directly instead of JSON.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -2344,6 +2344,31 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Transcription"
+                },
+                "examples": {
+                  "waiting": {
+                    "summary": "Waiting for its turn: Google Drive links take turns on an account",
+                    "value": {
+                      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                      "status": "created",
+                      "audio_duration_seconds": null,
+                      "file_size_bytes": null,
+                      "language": null,
+                      "diarize": false,
+                      "speaker_count": null,
+                      "align": true,
+                      "cost_cents": null,
+                      "created_at": "2026-11-23T17:02:18.000Z",
+                      "started_at": null,
+                      "source_url": "https://drive.google.com/file/d/1AbC/view",
+                      "progress": "Waiting: Google Drive links on this account download 3 at a time. This one starts by itself when one of yours finishes.",
+                      "waiting": {
+                        "reason": "account_drive_limit",
+                        "since": "2026-11-23T17:02:31.000Z",
+                        "retry_at": null
+                      }
+                    }
+                  }
                 }
               },
               "text/plain": {
@@ -4301,8 +4326,8 @@
         "tags": [
           "Feedback"
         ],
-        "summary": "Rate a job or report a problem with it",
-        "description": "Sends feedback on one of your transcriptions to the Scriptivox team: a rating from 1 to 5 on a completed job, a problem report (`problem: true` with `what_happened`) on any job, or both in one call. Every feedback needs words, at least 20 characters: a rating needs `comment` or `their_words`, a problem report `what_happened` or `their_words`. Topics are optional. A second rating of the same job replaces the first. A rating of 1 or 2 also opens a problem report. Every reported problem is resolved within 24 hours, and the reply goes to your account's email. At most 5 new problem reports a day per account; a report on a job whose report is still open is added to it. If a kind of feedback is switched off, what you send is kept as the nearest kind that is on: `rating_saved` is false, `saved_as` names the kind it was kept as, and `notice` says so.",
+        "summary": "Rate a job, report a problem with it, or report that \"no speech\" was wrong",
+        "description": "Sends feedback on one of your transcriptions to the Scriptivox team: a rating from 1 to 5 on a completed job, a problem report (`problem: true` with `what_happened`) on any job, or both in one call. Every feedback needs words, at least 20 characters: a rating needs `comment` or `their_words`, a problem report `what_happened` or `their_words`. Topics are optional. A second rating of the same job replaces the first. A rating of 1 or 2 also opens a problem report. Every reported problem is resolved within 24 hours, and the reply goes to your account's email. At most 5 new problem reports a day per account; a report on a job whose report is still open is added to it. If a kind of feedback is switched off, what you send is kept as the nearest kind that is on: `rating_saved` is false, `saved_as` names the kind it was kept as, and `notice` says so. When a job's result says `no_speech: true` but the file has speech, send `report_no_speech: true` on its own (no rating, no problem) with `their_words` or `comment` saying what is in the recording, at least 20 characters: the team checks the file within 24 hours. At most 3 of these a day per account; a second one on the same job answers `already_reported: true` and sends nothing new.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -4404,7 +4429,7 @@
             }
           },
           "400": {
-            "description": "No rating and no problem; a rating without words (comment or their_words, at least 20 characters); a problem without what_happened or with fewer than 20 characters of words; a rating outside 1 to 5; or a field of the wrong type (INVALID_REQUEST).",
+            "description": "No rating and no problem; a rating without words (comment or their_words, at least 20 characters); a problem without what_happened or with fewer than 20 characters of words; report_no_speech with a rating or a problem, or without 20 characters of their_words or comment; a rating outside 1 to 5; or a field of the wrong type (INVALID_REQUEST).",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -4632,7 +4657,7 @@
             }
           },
           "409": {
-            "description": "A rating on a job that has not completed: send a problem report instead; or this kind of feedback is switched off and no other kind can keep it (CONFLICT).",
+            "description": "A rating on a job that has not completed: send a problem report instead; report_no_speech on a job not marked no speech: send a problem report instead; or this kind of feedback is switched off and no other kind can keep it (CONFLICT).",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -5295,7 +5320,7 @@
           "Transcriptions"
         ],
         "summary": "List transcriptions",
-        "description": "Lists the calling key’s transcriptions, newest first by default, with optional filters and cursor pagination. Soft-deleted transcriptions are excluded. Each item has the same shape as GET /v1/transcribe/{id} except that the heavy `result` object is omitted — fetch a transcription individually for the transcript. Pagination is stable across new inserts: pass `next_cursor` back in as `cursor`. `next_cursor` is null on the last page.",
+        "description": "Lists the calling key’s transcriptions, newest first by default, with optional filters and cursor pagination. Soft-deleted transcriptions are excluded. Each item has the same shape as GET /v1/transcribe/{id} except that the heavy `result` object is omitted — fetch a transcription individually for the transcript. An item that waits for its turn (or for a later try at a Google Drive link) carries `waiting` and the reason as `progress`, as GET /v1/transcribe/{id} does. Pagination is stable across new inserts: pass `next_cursor` back in as `cursor`. `next_cursor` is null on the last page.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -6727,6 +6752,10 @@
                 "type": "integer",
                 "description": "On a 429 RATE_LIMIT_EXCEEDED for jobs in progress: how many of your jobs are in progress now."
               },
+              "not_started": {
+                "$ref": "#/components/schemas/NotStarted",
+                "description": "On a 429 RATE_LIMIT_EXCEEDED for jobs in progress: how many of those have not started yet; each starts by itself."
+              },
               "scope": {
                 "type": "string",
                 "description": "On a 503 MAINTENANCE: what is paused. `upload`: new jobs and uploads; `link`: a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) on POST /v1/transcribe, while uploads and other file addresses carry on; `global`: site-wide maintenance (new jobs and uploads) or full maintenance (every operation, reads included, for example during a planned upgrade). New values may be added. GET /v1/status names the same scopes, and its `still_working` tells the two `global` cases apart.",
@@ -7030,6 +7059,30 @@
           "message": {
             "type": "string",
             "description": "Human-readable confirmation. Not machine-readable; do not branch on it."
+          },
+          "not_started": {
+            "$ref": "#/components/schemas/NotStarted"
+          }
+        }
+      },
+      "NotStarted": {
+        "type": "object",
+        "title": "NotStarted",
+        "description": "The account's jobs that had not started yet when this request was answered, this one included on an accepted job (a job counted here may start a moment later). Google Drive links download 3 at a time on an account and each starts by itself, so a batch of them takes turns: no need to send any again. A repeated request with the same Idempotency-Key gets the first answer's counts.",
+        "required": [
+          "total",
+          "google_drive"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Jobs not started yet."
+          },
+          "google_drive": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Of those, Google Drive links."
           }
         }
       },
@@ -7073,7 +7126,7 @@
           "completed",
           "failed"
         ],
-        "description": "created: accepted, about to download or validate. downloading: URL flow only. processing: being transcribed. completed: result is populated. failed: inspect error.code."
+        "description": "created: accepted, about to download or validate. downloading: URL flow only. pending: accepted, not being transcribed yet (rarely seen; treat it as in progress, like created). processing: being transcribed. completed: result is populated. failed: inspect error.code. A job waiting for its turn keeps its status (created or downloading) and adds `waiting`."
       },
       "TranscriptionError": {
         "type": "object",
@@ -7305,7 +7358,7 @@
               "string",
               "null"
             ],
-            "description": "Free-text stage label while processing, e.g. \"downloading\". For display only — the machine-readable state is status."
+            "description": "A sentence about the job's stage, for display only — the machine-readable state is status (and `waiting`). Always present on GET /v1/transcribe/{id}; on GET /v1/transcriptions only while the job waits, where it gives the reason in a sentence."
           },
           "created_at": {
             "type": "string",
@@ -7330,6 +7383,9 @@
           },
           "error": {
             "$ref": "#/components/schemas/TranscriptionError"
+          },
+          "waiting": {
+            "$ref": "#/components/schemas/TranscriptionWaiting"
           }
         }
       },
@@ -7358,6 +7414,51 @@
             }
           }
         ]
+      },
+      "TranscriptionWaiting": {
+        "type": "object",
+        "title": "TranscriptionWaiting",
+        "description": "Present only while the job waits, with status \"created\" or \"downloading\": why it has not started yet. It starts by itself; nothing needs to be sent again. `progress` gives the same in a sentence. Absent once the job starts, and on every other status.",
+        "required": [
+          "reason",
+          "since",
+          "retry_at"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "account_drive_limit",
+              "account_download_limit",
+              "busy",
+              "drive_retry"
+            ],
+            "description": "Why it waits. account_drive_limit: This account's Google Drive links download 3 at a time, and this one starts when one of them finishes. account_download_limit: This account already has as many files being fetched and prepared at once as it can; this one starts when one of them finishes. busy: Many jobs are running for everyone; this one starts in a few minutes. drive_retry: Google Drive did not send the file just now, and it is tried again at `retry_at`. Nothing is charged while it waits. New values may be added: show `progress` for a value you do not know.",
+            "x-enumDescriptions": {
+              "account_drive_limit": "This account's Google Drive links download 3 at a time, and this one starts when one of them finishes.",
+              "account_download_limit": "This account already has as many files being fetched and prepared at once as it can; this one starts when one of them finishes.",
+              "busy": "Many jobs are running for everyone; this one starts in a few minutes.",
+              "drive_retry": "Google Drive did not send the file just now, and it is tried again at `retry_at`. Nothing is charged while it waits."
+            },
+            "example": "account_drive_limit"
+          },
+          "since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When this wait began (UTC). For drive_retry, when Google Drive did not send the file; otherwise when the job first had to wait for its turn (a Google Drive link that waits again after a later try keeps its first time)."
+          },
+          "retry_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "For drive_retry: when the next try is planned (UTC). Null for every other reason."
+          }
+        }
       },
       "TranscriptionPage": {
         "type": "object",
@@ -7703,12 +7804,12 @@
           "comment": {
             "type": "string",
             "maxLength": 1000,
-            "description": "What made it that rating, in words. With a rating: comment or their_words, at least 20 characters."
+            "description": "What made it that rating, in words. With a rating: comment or their_words, at least 20 characters. With report_no_speech: what is in the recording, when their_words is empty."
           },
           "their_words": {
             "type": "string",
             "maxLength": 1000,
-            "description": "Your end user's own words, unchanged, if you have them. Counts as the words for a rating or a problem report."
+            "description": "Your end user's own words, unchanged, if you have them. Counts as the words for a rating, a problem report or report_no_speech."
           },
           "problem": {
             "type": "boolean",
@@ -7718,6 +7819,10 @@
             "type": "string",
             "maxLength": 1000,
             "description": "What went wrong, for a problem report: what_happened or their_words, at least 20 characters."
+          },
+          "report_no_speech": {
+            "type": "boolean",
+            "description": "true when the job's result says no_speech: true but the file has speech; the team checks the file within 24 hours. Send it on its own (no rating, no problem), with their_words or comment saying what is in the recording, at least 20 characters. At most 3 a day per account."
           }
         }
       },
@@ -7787,6 +7892,14 @@
           "problem_report_error": {
             "type": "string",
             "description": "Set when the rating was saved but the problem report was not (for example the daily limit)."
+          },
+          "no_speech_reported": {
+            "type": "boolean",
+            "description": "Set (true) for report_no_speech: the team has the report, sent now or earlier. rating_saved is false and problem_report null; saved_as says when it was kept as a problem report."
+          },
+          "already_reported": {
+            "type": "boolean",
+            "description": "Set with no_speech_reported: true when this job's \"no speech\" was reported before, so nothing new was sent."
           }
         }
       },
