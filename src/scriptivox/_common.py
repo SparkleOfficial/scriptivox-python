@@ -25,6 +25,18 @@ MAX_RETRY_AFTER = 60.0
 DEFAULT_WAIT_TIMEOUT = 2 * 60 * 60.0
 DEFAULT_POLL_INTERVAL = 2.0
 DEFAULT_MAX_POLL_INTERVAL = 10.0
+#: The longest Retry-After wait() follows on an unfinished job (the API sends 3 to 20 seconds).
+MAX_FOLLOWED_RETRY_AFTER = 60.0
+
+
+def next_poll_delay(retry_after: Optional[float], interval: float, max_poll_interval: Optional[float]) -> float:
+    """How long wait() sleeps after an unfinished job's answer: the longer of its own growing interval and the API's
+    Retry-After (up to 60 s), so it never checks sooner than the API asks nor more often than without the header; a
+    max_poll_interval the caller set still caps it. Without Retry-After: the growing interval, as before."""
+    if retry_after is None or retry_after != retry_after or retry_after < 0:  # absent or NaN
+        return interval
+    seconds = max(interval, min(MAX_FOLLOWED_RETRY_AFTER, float(retry_after)))
+    return min(seconds, max_poll_interval) if max_poll_interval is not None else seconds
 #: Per socket operation during the file upload: no byte moving for this long ends that try.
 UPLOAD_IDLE_TIMEOUT = 120.0
 CHUNK = 1024 * 1024
