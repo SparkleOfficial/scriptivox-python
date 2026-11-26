@@ -37,6 +37,7 @@ class APIError(ScriptivoxError):
         retry_after: Optional[float] = None,
         error: Optional[Dict[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
+        help_id: Optional[str] = None,
     ) -> None:
         ref = ", ".join(x for x in (code, f"request {request_id}" if request_id else None) if x)
         super().__init__(f"{message} [{ref}]")
@@ -48,7 +49,11 @@ class APIError(ScriptivoxError):
         self.message = message
         #: ``X-Request-Id`` / ``error.request_id`` (``req_`` + 16 hex). Quote it to support.
         self.request_id = request_id
+        #: The page that explains this exact error: ``https://www.scriptivox.com/errors/{help_id}``.
         self.docs_url = docs_url
+        #: The help page's id (``error.help_id``), e.g. "api-key-invalid". Stable: an id is never renamed, and one code
+        #: can have several pages. Branch on ``code``; use ``help_id`` for more detail than the code gives.
+        self.help_id = help_id
         #: Seconds from the ``Retry-After`` header, when the answer had one.
         self.retry_after = retry_after
         #: The whole ``error`` object (extra fields such as ``in_flight`` and ``limit`` live here).
@@ -197,6 +202,10 @@ class TranscriptionFailedError(ScriptivoxError):
     def __init__(self, transcription: Mapping[str, Any]) -> None:
         error = transcription.get("error") or {}
         self.code: str = error.get("code") or "UNKNOWN_ERROR"
+        #: The page that explains this failure (the job's ``error.docs_url``), when it has one.
+        self.docs_url: Optional[str] = error.get("docs_url") if isinstance(error.get("docs_url"), str) else None
+        #: That page's stable id (the job's ``error.help_id``), e.g. "drive-not-shared", when it has one.
+        self.help_id: Optional[str] = error.get("help_id") if isinstance(error.get("help_id"), str) else None
         self.transcription_id: str = transcription.get("id", "")
         self.transcription: Dict[str, Any] = dict(transcription)
         message = error.get("message") or "The transcription failed."

@@ -4,7 +4,7 @@
     "title": "Scriptivox Transcription API",
     "version": "1.0.0",
     "summary": "Transcribe recorded audio and video into text with word-level timestamps and speaker labels.",
-    "description": "The Scriptivox API turns recorded audio and video into text. Submit a file by public URL (a file,\na Google Drive, Dropbox and OneDrive share link, or a TikTok, Instagram, Facebook, X or Snapchat post) or by\npresigned upload, poll for the result or receive a webhook, and read back a structured transcript\nwith per-utterance and per-word timestamps, optional speaker diarization, and SRT/WebVTT/plain-text\nexports.\n\n**When to use it.** Batch or on-demand transcription of *recorded* media: meeting and interview\nrecordings, podcasts, lecture capture, call archives, video libraries that need captions, and\npipelines that need word-level timestamps for clip search. 119 languages. It is not a live\nstreaming or real-time dictation API — every job takes a complete file.\n\n**Shape of an integration.** `POST /v1/transcribe` returns immediately with `status: \"created\"`;\nthe file is downloaded and validated in the background, so input errors surface later on\n`GET /v1/transcribe/{id}` with `status: \"failed\"`, not on the submit call. A correct client must\nhandle failures on the poll path. The one exception is a social post link: it is checked on the\nsubmit call (a few seconds), and a post that cannot be transcribed is refused there with a 400.\n\n**Limits.** 5 GB per file, 1 second to 10 hours of audio, 26 accepted file formats. Source\naudio is deleted 24 hours after the job ends; transcripts stay retrievable.\n\n**Billing.** $0.20 per hour of audio, pay as you go. Cost is reserved once the duration is known\n(after download or validation), not at submit time. Failed and cancelled jobs are free — the\nreservation is released.\n\n**Errors.** Every error response is `{\"error\": {\"code\", \"message\"}}` with a machine-readable code.\nSee https://platform.scriptivox.com/docs/api-reference#error-codes.\n\n**Support.** Email support@scriptivox.com with the account email, the job id, when it happened\n(with time zone) and the exact error code and message; never an API key. Any feedback or issue\nsent to support, by email or any other channel, is resolved within 24 hours. This is our founders'\npersonal guarantee.",
+    "description": "The Scriptivox API turns recorded audio and video into text. Submit a file by public URL (a file,\na Google Drive, Dropbox, OneDrive and Yandex Disk share link, or a YouTube, TikTok, Instagram, Facebook, X, Snapchat or Douyin post) or by\npresigned upload, poll for the result or receive a webhook, and read back a structured transcript\nwith per-utterance and per-word timestamps, optional speaker diarization, and SRT/WebVTT/plain-text\nexports.\n\n**When to use it.** Batch or on-demand transcription of *recorded* media: meeting and interview\nrecordings, podcasts, lecture capture, call archives, video libraries that need captions, and\npipelines that need word-level timestamps for clip search. 119 languages. It is not a live\nstreaming or real-time dictation API — every job takes a complete file.\n\n**Shape of an integration.** `POST /v1/transcribe` returns immediately with `status: \"created\"`;\nthe file is downloaded and validated in the background, so input errors surface later on\n`GET /v1/transcribe/{id}` with `status: \"failed\"`, not on the submit call. A correct client must\nhandle failures on the poll path. The one exception is a social post link: it is checked on the\nsubmit call (a few seconds), and a post that cannot be transcribed is refused there with a 400.\n\n**Limits.** 5 GB per file, 1 second to 10 hours of audio, 26 accepted file formats. Source\naudio is deleted 24 hours after the job ends; transcripts stay retrievable.\n\n**Billing.** $0.20 per hour of audio, pay as you go. Cost is reserved once the duration is known\n(after download or validation), not at submit time. Failed and cancelled jobs are free — the\nreservation is released.\n\n**Errors.** Every error response is `{\"error\": {\"code\", \"message\", \"docs_url\", \"help_id\"}}` with a machine-readable code;\n`docs_url` is the page that explains that exact error and what to do (https://www.scriptivox.com/errors), and a failed\njob's `error` carries the same two fields. See https://platform.scriptivox.com/docs/api-reference#error-codes.\n\n**Support.** Email support@scriptivox.com with the account email, the job id, when it happened\n(with time zone) and the exact error code and message; never an API key. Any feedback or issue\nsent to support, by email or any other channel, is resolved within 24 hours. This is our founders'\npersonal guarantee.",
     "termsOfService": "https://www.scriptivox.com/termsofuse",
     "contact": {
       "name": "Scriptivox API support",
@@ -1293,7 +1293,8 @@
                         "scope": "upload",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -1307,7 +1308,8 @@
                         "scope": "upload",
                         "back_by": "2026-11-20T14:30:00.000Z",
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -1321,7 +1323,8 @@
                         "scope": "global",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -1344,7 +1347,7 @@
           "Transcriptions"
         ],
         "summary": "Start a transcription",
-        "description": "Accepts a job and returns immediately with status \"created\". Supply exactly one of `url` (we download the file), `upload_id` (from POST /v1/upload) or `source_transcription_id` (transcribe an earlier completed job again, from the audio it holds, with new options; within 24 hours of its end, after that 409 SOURCE_EXPIRED). Download and validation happen in the background, so input problems surface on GET /v1/transcribe/{id} with status \"failed\" — not here. The exception is a link to a TikTok, Instagram, Facebook, X or Snapchat post: it is checked before the job is created (this call then takes a few seconds), and a post that can't be transcribed (private, deleted, no video) is refused here with 400 URL_NOT_ACCESSIBLE, `error.reason` and `error.platform`, with nothing created or charged. Duration and cost are determined after download or validation. Requires a non-zero balance: returns 402 ZERO_BALANCE at $0.",
+        "description": "Accepts a job and returns immediately with status \"created\". Supply exactly one of `url` (we download the file), `upload_id` (from POST /v1/upload) or `source_transcription_id` (transcribe an earlier completed job again, from the audio it holds, with new options; within 24 hours of its end, after that 409 SOURCE_EXPIRED). Download and validation happen in the background, so input problems surface on GET /v1/transcribe/{id} with status \"failed\" — not here. The exception is a link to a YouTube, TikTok, Instagram, Facebook, X, Snapchat or Douyin post: it is checked before the job is created (this call then takes a few seconds), and a post that can't be transcribed (private, deleted, no video) is refused here with 400 URL_NOT_ACCESSIBLE, `error.reason` and `error.platform`, with nothing created or charged. Duration and cost are determined after download or validation. Requires a non-zero balance: returns 402 ZERO_BALANCE at $0.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -1375,7 +1378,7 @@
               },
               "examples": {
                 "fromUrl": {
-                  "summary": "From a public URL: a file, or a Google Drive, Dropbox and OneDrive share link",
+                  "summary": "From a public URL: a file, or a Google Drive, Dropbox, OneDrive and Yandex Disk share link",
                   "value": {
                     "url": "https://example.com/podcast-episode.mp3",
                     "language": "en",
@@ -1383,7 +1386,7 @@
                   }
                 },
                 "fromSocialPost": {
-                  "summary": "From a public TikTok, Instagram, Facebook, X or Snapchat post",
+                  "summary": "From a public YouTube, TikTok, Instagram, Facebook, X, Snapchat or Douyin post",
                   "value": {
                     "url": "https://www.instagram.com/reel/C0nT3stR33l/",
                     "language": "en"
@@ -1469,7 +1472,7 @@
             }
           },
           "400": {
-            "description": "Invalid body (INVALID_REQUEST), unsupported media (INVALID_MEDIA_FORMAT), or an upload that was never completed, already consumed, or expired (FILE_NOT_UPLOADED, UPLOAD_ALREADY_USED, UPLOAD_EXPIRED, FILE_TOO_LARGE). Unknown top-level fields are rejected rather than ignored. For a TikTok, Instagram, Facebook, X or Snapchat post that can't be transcribed: URL_NOT_ACCESSIBLE with `error.reason` link_not_verifiable, link_not_found, link_unsupported or link_no_media and `error.platform`, or DURATION_TOO_LONG when its video is longer than 10 hours. A link to a site whose links cannot be transcribed right now: INVALID_REQUEST with `error.reason` platform_disabled. In each case nothing is created or charged, and the `message` says why in plain words.",
+            "description": "Invalid body (INVALID_REQUEST), unsupported media (INVALID_MEDIA_FORMAT), or an upload that was never completed, already consumed, or expired (FILE_NOT_UPLOADED, UPLOAD_ALREADY_USED, UPLOAD_EXPIRED, FILE_TOO_LARGE). Unknown top-level fields are rejected rather than ignored. For a YouTube, TikTok, Instagram, Facebook, X, Snapchat or Douyin post that can't be transcribed: URL_NOT_ACCESSIBLE with `error.reason` link_not_verifiable, link_not_found, link_unsupported or link_no_media (a YouTube video also link_private, link_age_restricted, link_members_only, link_premium_only or live_stream) and `error.platform`, or DURATION_TOO_LONG when its video is longer than 10 hours. For a podcast link (an Apple Podcasts episode or an episode page on a podcast host) or a Yandex Disk link that leads to no audio or video file: URL_NOT_ACCESSIBLE with `error.reason` podcast_show_link, podcast_not_found, podcast_episode_not_found, podcast_no_feed, yandex_not_found, yandex_folder, yandex_not_media or yandex_no_download; a Spotify link: spotify_no_audio. A link to a site whose links cannot be transcribed right now: INVALID_REQUEST with `error.reason` platform_disabled. In each case nothing is created or charged, and the `message` says why in plain words.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -2035,7 +2038,7 @@
             }
           },
           "503": {
-            "description": "A social post link could not be checked right now (LINK_CHECK_UNAVAILABLE): `error.reason` verify_rate_limited when link checks are busy (`Retry-After: 600`), link_check_failed when the check did not answer (`Retry-After: 60`). Or new jobs are paused for maintenance (MAINTENANCE): `error.scope` says what is paused, `error.status_url` is GET /v1/status. `Retry-After` is 300 seconds; when we set a time the pause should end by, `error.back_by` gives it (ISO 8601, UTC) and `Retry-After` counts the seconds until then, at least 60 and at most 3600, so a long pause is looked at again within the hour. A time that has passed is never sent. While link imports are paused, a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) answers `503 MAINTENANCE` with `error.scope` `link`; uploads and other file addresses carry on. Or the upload_id's upload could not be read just now (TEMPORARILY_UNAVAILABLE). Nothing was created or charged; send the same request again after the `Retry-After` seconds. During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same.",
+            "description": "A social post link could not be checked right now (LINK_CHECK_UNAVAILABLE): `error.reason` verify_rate_limited when link checks are busy (`Retry-After: 600`), link_check_failed when the check did not answer (`Retry-After: 60`); for a podcast or Yandex Disk link, podcast_busy or yandex_busy (`Retry-After: 600`) and podcast_unavailable or yandex_unavailable (`Retry-After: 60`). Or new jobs are paused for maintenance (MAINTENANCE): `error.scope` says what is paused, `error.status_url` is GET /v1/status. `Retry-After` is 300 seconds; when we set a time the pause should end by, `error.back_by` gives it (ISO 8601, UTC) and `Retry-After` counts the seconds until then, at least 60 and at most 3600, so a long pause is looked at again within the hour. A time that has passed is never sent. While link imports are paused, a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) answers `503 MAINTENANCE` with `error.scope` `link`; uploads and other file addresses carry on. Or the upload_id's upload could not be read just now (TEMPORARILY_UNAVAILABLE). Nothing was created or charged; send the same request again after the `Retry-After` seconds. During full maintenance (for example during a planned upgrade) every operation, reads included, answers MAINTENANCE with `error.scope` `global` and `Retry-After: 300`, or the seconds until `error.back_by` when we set a time: nothing was done, and GET /v1/status says the same.",
             "headers": {
               "X-Request-Id": {
                 "description": "Unique id of this request: `req_` followed by 16 hex characters. Sent on every response, success or error; error bodies repeat it as `error.request_id`. Include it when you contact support about a call.",
@@ -2098,7 +2101,8 @@
                         "message": "Link checks are busy right now. Please wait a few minutes and try again.",
                         "reason": "verify_rate_limited",
                         "platform": "instagram",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/link-check-unavailable",
+                        "help_id": "link-check-unavailable",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2112,7 +2116,8 @@
                         "scope": "upload",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2126,7 +2131,8 @@
                         "scope": "upload",
                         "back_by": "2026-11-20T14:30:00.000Z",
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2140,7 +2146,8 @@
                         "scope": "link",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2154,7 +2161,8 @@
                         "scope": "global",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2798,7 +2806,8 @@
                       "error": {
                         "code": "TEMPORARILY_UNAVAILABLE",
                         "message": "The transcription could not be read just now (a brief problem on our side). Nothing was changed. Send the same request again in 5 seconds.",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/try-again-shortly",
+                        "help_id": "try-again-shortly",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -2812,7 +2821,8 @@
                         "scope": "global",
                         "back_by": null,
                         "status_url": "https://api.scriptivox.com/v1/status",
-                        "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                        "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                        "help_id": "maintenance",
                         "request_id": "req_8f3a1c2b9d4e6f70"
                       }
                     }
@@ -3281,7 +3291,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -3378,7 +3389,9 @@
                   "status": "failed",
                   "error": {
                     "code": "CANCELLED",
-                    "message": "Cancelled by customer"
+                    "message": "Cancelled by customer",
+                    "docs_url": "https://www.scriptivox.com/errors/job-cancelled",
+                    "help_id": "job-cancelled"
                   },
                   "released_cents": 0
                 }
@@ -3766,7 +3779,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -4306,7 +4320,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -4861,7 +4876,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -5299,7 +5315,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -5777,7 +5794,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -6152,7 +6170,8 @@
                     "scope": "global",
                     "back_by": null,
                     "status_url": "https://api.scriptivox.com/v1/status",
-                    "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+                    "docs_url": "https://www.scriptivox.com/errors/maintenance",
+                    "help_id": "maintenance",
                     "request_id": "req_8f3a1c2b9d4e6f70"
                   }
                 }
@@ -6394,7 +6413,9 @@
                 "status": "failed",
                 "error": {
                   "code": "URL_NOT_ACCESSIBLE",
-                  "message": "The URL could not be downloaded."
+                  "message": "The URL could not be downloaded.",
+                  "docs_url": "https://www.scriptivox.com/errors/link-not-accessible",
+                  "help_id": "link-not-accessible"
                 }
               }
             }
@@ -6590,7 +6611,7 @@
       "Error": {
         "type": "object",
         "title": "Error",
-        "description": "Every failed request returns this shape. `code` is stable and machine-readable; `message` is a sanitized, customer-safe string and never a raw stack trace; `request_id` identifies the request for support.",
+        "description": "Every failed request returns this shape. `code` is stable and machine-readable; `message` is a sanitized, customer-safe string and never a raw stack trace; `docs_url` is the page that explains this exact error and what to do, and `help_id` is that page's id; `request_id` identifies the request for support.",
         "required": [
           "error"
         ],
@@ -6648,7 +6669,7 @@
                   "FILE_TOO_LARGE": "File exceeds 5 GB limit",
                   "UPLOAD_ALREADY_USED": "Upload already used for a transcription",
                   "UPLOAD_EXPIRED": "Upload URL expired (1 hour TTL)",
-                  "URL_NOT_ACCESSIBLE": "A TikTok, Instagram, Facebook, X or Snapchat post that can't be transcribed, refused when you send it: nothing is created or charged. `error.reason` says why: `link_not_verifiable` (private, deleted or not available in the region), `link_not_found` (the video can't be opened), `link_unsupported` (a kind of link that is not a video, such as a Facebook Page or profile), `link_no_media` (no audio or video, such as a photo post); `error.platform` names the site. Sending the same link again gives the same answer. Also returned at once for a Google Drive link while Google has paused downloads of your files (`error.reason` `drive_paused`): a Drive job of yours ended with Google's download limit, so new Drive links are refused until `error.paused_until` (24 hours later); upload the file instead. Other links that can't be downloaded fail later on `GET /v1/transcribe/{id}`.",
+                  "URL_NOT_ACCESSIBLE": "A YouTube, TikTok, Instagram, Facebook, X, Snapchat or Douyin post that can't be transcribed, refused when you send it: nothing is created or charged. `error.reason` says why: `link_not_verifiable` (private, deleted or not available in the region), `link_not_found` (the video can't be opened), `link_unsupported` (a kind of link that is not a video, such as a Facebook Page or profile), `link_no_media` (no audio or video, such as a photo post), and for a YouTube video `link_private`, `link_age_restricted`, `link_members_only`, `link_premium_only` or `live_stream`; `error.platform` names the site. Sending the same link again gives the same answer. Also returned at once for a Google Drive link while Google has paused downloads of your files (`error.reason` `drive_paused`): a Drive job of yours ended with Google's download limit, so new Drive links are refused until `error.paused_until` (24 hours later); upload the file instead. Also returned at once for a podcast link (an Apple Podcasts episode, or an episode page on a podcast host) or a Yandex Disk link that leads to no audio or video file (`error.reason` `podcast_show_link`, `podcast_not_found`, `podcast_episode_not_found`, `podcast_no_feed`, `yandex_not_found`, `yandex_folder`, `yandex_not_media` or `yandex_no_download`) and for a Spotify link (`spotify_no_audio`). Other links that can't be downloaded fail later on `GET /v1/transcribe/{id}`.",
                   "DURATION_TOO_LONG": "A social post whose video is longer than 10 hours, refused when you send it (`error.platform` names the site). Nothing is created or charged.",
                   "INVALID_API_KEY": "Invalid or missing API key",
                   "API_KEY_REVOKED": "API key has been revoked",
@@ -6666,9 +6687,9 @@
                   "SOURCE_EXPIRED": "`source_transcription_id` names a job whose audio was deleted 24 hours after it ended, so it cannot be transcribed again: nothing is created or charged. Send the file again with `upload_id` or `url`.",
                   "IDEMPOTENCY_KEY_CONFLICT": "`Idempotency-Key` reused with a different request body. Use a fresh key for a different operation.",
                   "NO_SPEECH": "A link whose transcriptions for your account already found no speech twice in the last 30 days (each completed with an empty transcript), refused when you send it again: nothing is created. `error.transcription_ids` names the earlier jobs. Send a recording with audible speech, or a different file.",
-                  "RATE_LIMIT_EXCEEDED": "Too many requests (see Rate Limits), or 25 jobs already in progress on POST /v1/transcribe. On POST /v1/transcribe with a social post link, also a limit on social links set on your account (`error.reason` `social_link_limit`, with `error.limit` and `error.window_seconds`; accounts have none unless Scriptivox sets one); uploads and other links are not affected. Wait the seconds in the `Retry-After` header.",
+                  "RATE_LIMIT_EXCEEDED": "Too many requests (see Rate Limits: wait the seconds in the `Retry-After` header), or 25 jobs already in progress on POST /v1/transcribe (no `Retry-After`: submit more once one finishes, which GET /v1/transcribe/{id} or the webhook tells). On POST /v1/transcribe with a social post link, also a limit on social links set on your account (`error.reason` `social_link_limit`, with `error.limit` and `error.window_seconds`; accounts have none unless Scriptivox sets one), with `Retry-After`; uploads and other links are not affected.",
                   "INTERNAL_ERROR": "Server error",
-                  "LINK_CHECK_UNAVAILABLE": "A social post link could not be checked right now, so nothing was created or charged. `error.reason` `verify_rate_limited`: link checks are busy (`Retry-After: 600`); `link_check_failed`: the check did not answer (`Retry-After: 60`). Send the same request again after that many seconds. Links to files and to Google Drive, Dropbox or OneDrive are not checked and are not affected.",
+                  "LINK_CHECK_UNAVAILABLE": "A social post link could not be checked right now, so nothing was created or charged. `error.reason` `verify_rate_limited`: link checks are busy (`Retry-After: 600`); `link_check_failed`: the check did not answer (`Retry-After: 60`). Send the same request again after that many seconds. Links to files and to Google Drive, Dropbox, OneDrive or Yandex Disk are not checked and are not affected.",
                   "TEMPORARILY_UNAVAILABLE": "Your data could not be read just now (a brief problem on our side), so the request was not completed: nothing was created, changed or charged. Send the same request again after the number of seconds in the `Retry-After` header.",
                   "MAINTENANCE": "Paused for maintenance: nothing was created, changed or charged. `error.scope` says what is paused (`upload`: new jobs and uploads; `link`: a `url` to a video or social media site (such as TikTok, Instagram, Facebook, X or Snapchat) on `POST /v1/transcribe`, while uploads and other file addresses carry on; `global`: site-wide maintenance, which stops new jobs and uploads, or full maintenance, for example during a planned upgrade, when every operation gets this answer, reads included), and `error.status_url` is `GET /v1/status`, which needs no key and says what still works. Send the same request again after the number of seconds in the `Retry-After` header (300; when we set a time we expect the pause to end, `error.back_by` gives it and `Retry-After` counts down to it, from 60 to 3600 seconds).",
                   "ENDPOINT_REMOVED": "This endpoint has been removed. The `message` says what to use instead (for `POST /v1/accounts`: create the account at https://www.scriptivox.com/signup).",
@@ -6707,6 +6728,40 @@
                   "MAINTENANCE": 503,
                   "ENDPOINT_REMOVED": 410,
                   "ISSUER_UNCONFIGURED": 503
+                },
+                "x-helpUrlByCode": {
+                  "INVALID_REQUEST": "https://www.scriptivox.com/errors/request-invalid",
+                  "INVALID_FILENAME": "https://www.scriptivox.com/errors/filename-invalid",
+                  "INVALID_MEDIA_FORMAT": "https://www.scriptivox.com/errors/file-type-not-supported",
+                  "FILE_NOT_UPLOADED": "https://www.scriptivox.com/errors/upload-never-arrived",
+                  "FILE_TOO_LARGE": "https://www.scriptivox.com/errors/file-too-large",
+                  "UPLOAD_ALREADY_USED": "https://www.scriptivox.com/errors/upload-already-used",
+                  "UPLOAD_EXPIRED": "https://www.scriptivox.com/errors/upload-expired",
+                  "URL_NOT_ACCESSIBLE": "https://www.scriptivox.com/errors/link-not-accessible",
+                  "DURATION_TOO_LONG": "https://www.scriptivox.com/errors/file-too-long",
+                  "INVALID_API_KEY": "https://www.scriptivox.com/errors/api-key-invalid",
+                  "API_KEY_REVOKED": "https://www.scriptivox.com/errors/api-key-revoked",
+                  "INSUFFICIENT_BALANCE": "https://www.scriptivox.com/errors/api-balance-too-low",
+                  "ZERO_BALANCE": "https://www.scriptivox.com/errors/api-no-balance",
+                  "UPLOAD_NOT_FOUND": "https://www.scriptivox.com/errors/upload-not-found",
+                  "TRANSCRIPTION_NOT_FOUND": "https://www.scriptivox.com/errors/transcript-not-found",
+                  "NOT_FOUND": "https://www.scriptivox.com/errors/endpoint-not-found",
+                  "FORBIDDEN": "https://www.scriptivox.com/errors/request-blocked",
+                  "METHOD_NOT_ALLOWED": "https://www.scriptivox.com/errors/method-not-allowed",
+                  "CONFLICT": "https://www.scriptivox.com/errors/action-not-allowed-now",
+                  "PAYLOAD_TOO_LARGE": "https://www.scriptivox.com/errors/request-body-too-large",
+                  "UNSUPPORTED_MEDIA_TYPE": "https://www.scriptivox.com/errors/request-not-json",
+                  "IDEMPOTENCY_KEY_LOCKED": "https://www.scriptivox.com/errors/request-in-progress",
+                  "SOURCE_EXPIRED": "https://www.scriptivox.com/errors/original-file-gone",
+                  "IDEMPOTENCY_KEY_CONFLICT": "https://www.scriptivox.com/errors/request-key-reused",
+                  "NO_SPEECH": "https://www.scriptivox.com/errors/no-speech-again",
+                  "RATE_LIMIT_EXCEEDED": "https://www.scriptivox.com/errors/rate-limited",
+                  "INTERNAL_ERROR": "https://www.scriptivox.com/errors/something-went-wrong",
+                  "LINK_CHECK_UNAVAILABLE": "https://www.scriptivox.com/errors/link-check-unavailable",
+                  "TEMPORARILY_UNAVAILABLE": "https://www.scriptivox.com/errors/try-again-shortly",
+                  "MAINTENANCE": "https://www.scriptivox.com/errors/maintenance",
+                  "ENDPOINT_REMOVED": "https://www.scriptivox.com/errors/endpoint-removed",
+                  "ISSUER_UNCONFIGURED": "https://www.scriptivox.com/errors/sign-in-not-configured"
                 }
               },
               "message": {
@@ -6716,7 +6771,14 @@
               "docs_url": {
                 "type": "string",
                 "format": "uri",
-                "description": "Documentation for this error code."
+                "description": "The page that explains this exact error, why it happens and what to do: `https://www.scriptivox.com/errors/{help_id}`. Often finer than the code: one code can have several pages (an `INVALID_REQUEST` for an export of an unfinished job links \"The transcript is not ready yet\", `https://www.scriptivox.com/errors/transcript-not-ready`). An error with no page of its own links the error-codes table (https://platform.scriptivox.com/docs/api-reference#error-codes) and has no `help_id`.",
+                "example": "https://www.scriptivox.com/errors/api-key-invalid"
+              },
+              "help_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "The id of the help page in `docs_url`. Stable: an id is never renamed, so code can keep its own text or handling per id. The pages are listed at https://www.scriptivox.com/errors and, as JSON, https://www.scriptivox.com/errors.json; each also has a plain-text copy at `https://www.scriptivox.com/errors/{help_id}.md`. New ids may be added. Branch on `code`; use `help_id` for more detail than the code gives.",
+                "example": "api-key-invalid"
               },
               "request_id": {
                 "type": "string",
@@ -6725,7 +6787,7 @@
               },
               "reason": {
                 "type": "string",
-                "description": "Why a link was refused on POST /v1/transcribe, when the code alone does not say: link_not_verifiable, link_not_found, link_unsupported, link_no_media (URL_NOT_ACCESSIBLE), platform_disabled (INVALID_REQUEST), social_link_limit (RATE_LIMIT_EXCEEDED), verify_rate_limited or link_check_failed (LINK_CHECK_UNAVAILABLE). New values may be added.",
+                "description": "Why a link was refused on POST /v1/transcribe, when the code alone does not say: link_not_verifiable, link_not_found, link_unsupported, link_no_media, link_private, link_age_restricted, link_members_only, link_premium_only, live_stream (a YouTube video that is private, age-restricted, for paying members, YouTube Premium only, or live now), podcast_show_link, podcast_not_found, podcast_episode_not_found, podcast_no_feed, yandex_not_found, yandex_folder, yandex_not_media, yandex_no_download, spotify_no_audio (URL_NOT_ACCESSIBLE), platform_disabled (INVALID_REQUEST), social_link_limit (RATE_LIMIT_EXCEEDED), verify_rate_limited, link_check_failed, podcast_unavailable, podcast_busy, yandex_unavailable or yandex_busy (LINK_CHECK_UNAVAILABLE). New values may be added.",
                 "example": "link_not_verifiable"
               },
               "platform": {
@@ -6733,7 +6795,7 @@
                   "string",
                   "null"
                 ],
-                "description": "The site of a refused social post link, in lower case (e.g. \"instagram\", \"tiktok\", \"facebook\", \"x\").",
+                "description": "The site of a refused video or social post link, in lower case (e.g. \"youtube\", \"instagram\", \"tiktok\", \"facebook\", \"x\").",
                 "example": "instagram"
               },
               "limit": {
@@ -6798,7 +6860,8 @@
           "error": {
             "code": "INVALID_API_KEY",
             "message": "Missing API key. Provide via Authorization header or x-api-key header.",
-            "docs_url": "https://platform.scriptivox.com/docs/api-reference#error-codes",
+            "docs_url": "https://www.scriptivox.com/errors/api-key-invalid",
+            "help_id": "api-key-invalid",
             "request_id": "req_8f3a1c2b9d4e6f70"
           }
         }
@@ -6873,7 +6936,7 @@
             "type": "string",
             "format": "uri",
             "maxLength": 2048,
-            "description": "Anonymously accessible http or https URL. An anonymous GET must return the raw file bytes, not an HTML preview, login form or password page. Direct and presigned URLs (S3, GCS, Azure SAS) always work. Share links work only when set to \"anyone with the link can view\": Google Drive, Dropbox files (not /scl/fo/ folder links), and OneDrive personal /redir or onedrive.live.com links. OneDrive 1drv.ms/v/c/ and /p/c/ photo shares cannot be used — Microsoft routes them through SharePoint Photos, which requires sign-in. A public post on TikTok, Instagram, Facebook, X and Snapchat also works: send the post's own link (a video or a reel). It is checked when you send it, and a post that is private, deleted or has no video is refused at once with 400 URL_NOT_ACCESSIBLE (see `error.reason`), with nothing created or charged.",
+            "description": "Anonymously accessible http or https URL. An anonymous GET must return the raw file bytes, not an HTML preview, login form or password page. Direct and presigned URLs (S3, GCS, Azure SAS) always work. Share links work only when set to \"anyone with the link can view\": Google Drive, Dropbox files (not /scl/fo/ folder links), and OneDrive personal /redir or onedrive.live.com links. OneDrive 1drv.ms/v/c/ and /p/c/ photo shares cannot be used — Microsoft routes them through SharePoint Photos, which requires sign-in. A public post on YouTube, TikTok, Instagram, Facebook, X, Snapchat and Douyin also works: send the post's own link (a video or a reel). It is checked when you send it, and a post that is private, deleted or has no video is refused at once with 400 URL_NOT_ACCESSIBLE (see `error.reason`), with nothing created or charged.",
             "example": "https://example.com/podcast-episode.mp3"
           },
           "language": {
@@ -7159,7 +7222,7 @@
             "x-enumDescriptions": {
               "URL_NOT_ACCESSIBLE": "URL flow only. Covers several non-fetchable cases: the URL returned 4xx/5xx; DNS didn't resolve; the connection was refused; the response was an HTML page instead of media (login/preview/folder/expired-link, or a video site's page instead of its video); the share requires sign-in (e.g. OneDrive `1drv.ms/v/c/…` SharePoint Photos shares); or the server returned a 200 with an empty body. For a social post that passed the check: its video file could not be downloaded, or the download links the site gave expired before the download and checking the post again did not give working ones. The `message` field names the specific cause when detectable.",
               "DOWNLOAD_FAILED": "URL flow only: the download started but was interrupted.",
-              "INVALID_MEDIA_FORMAT": "The file downloaded but could not be read: not actually audio/video, no audio track, or **shorter than the 1-second minimum** (message names the measured duration, e.g. `\"Audio too short (0.10s). Minimum duration is 1 second.\"`).",
+              "INVALID_MEDIA_FORMAT": "The file downloaded but could not be read: not actually audio/video, no audio track, or **shorter than the 1-second minimum** (message names the measured duration, e.g. `\"Audio too short (0.10s). Minimum duration is 1 second.\"`). The length is measured in whole seconds, rounded: audio of half a second or more counts as 1 second and is transcribed and billed as 1 second.",
               "FILE_TOO_LARGE": "The file is larger than 5 GB. For a URL this is only known once the download reaches the limit.",
               "DURATION_TOO_LONG": "Audio exceeds the 10-hour limit (only known after probing duration).",
               "INSUFFICIENT_BALANCE": "Once the length was measured, the job cost more than your available balance. Nothing was charged. The `message` names the amount needed; add funds and submit again.",
@@ -7171,11 +7234,39 @@
               "BILLING_ERROR": "Internal accounting issue while finalizing the charge. Your balance was **not** debited and the transcript was not delivered. Safe to retry.",
               "INTERNAL_ERROR": "A server-side step (e.g. queueing the job to our processing layer) failed after we accepted the request. Safe to retry.",
               "CANCELLED": "The transcription was cancelled by the customer via `POST /v1/transcribe/{id}/cancel`. You are not charged."
+            },
+            "x-helpUrlByCode": {
+              "URL_NOT_ACCESSIBLE": "https://www.scriptivox.com/errors/link-not-accessible",
+              "DOWNLOAD_FAILED": "https://www.scriptivox.com/errors/link-download-interrupted",
+              "INVALID_MEDIA_FORMAT": "https://www.scriptivox.com/errors/file-type-not-supported",
+              "FILE_TOO_LARGE": "https://www.scriptivox.com/errors/file-too-large",
+              "DURATION_TOO_LONG": "https://www.scriptivox.com/errors/file-too-long",
+              "INSUFFICIENT_BALANCE": "https://www.scriptivox.com/errors/api-balance-too-low",
+              "PROCESSING_ERROR": "https://www.scriptivox.com/errors/processing-failed",
+              "SPEECH_BELOW_THRESHOLD": "https://www.scriptivox.com/errors/speech-below-threshold",
+              "CREATED_TIMEOUT": "https://www.scriptivox.com/errors/job-start-failed",
+              "DOWNLOAD_TIMEOUT": "https://www.scriptivox.com/errors/link-download-timed-out",
+              "PROCESSING_TIMEOUT": "https://www.scriptivox.com/errors/processing-timed-out",
+              "BILLING_ERROR": "https://www.scriptivox.com/errors/charge-not-completed",
+              "INTERNAL_ERROR": "https://www.scriptivox.com/errors/something-went-wrong",
+              "CANCELLED": "https://www.scriptivox.com/errors/job-cancelled"
             }
           },
           "message": {
             "type": "string",
             "description": "Human-readable explanation. Wording may change between releases."
+          },
+          "docs_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The page that explains why this job failed and what to do: `https://www.scriptivox.com/errors/{help_id}`. Found from the job's own failure, so it is often finer than the code: a `URL_NOT_ACCESSIBLE` job whose Google Drive file is not shared links \"https://www.scriptivox.com/errors/drive-not-shared\", not the general page of that code. On the job, in the list and in the transcription.failed webhook.",
+            "example": "https://www.scriptivox.com/errors/drive-not-shared"
+          },
+          "help_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The id of the help page in `docs_url`. Stable: an id is never renamed. Pages: https://www.scriptivox.com/errors (JSON: https://www.scriptivox.com/errors.json; plain text: `https://www.scriptivox.com/errors/{help_id}.md`). New ids may be added. Branch on `code`; use `help_id` for more detail than the code gives.",
+            "example": "drive-not-shared"
           }
         }
       },

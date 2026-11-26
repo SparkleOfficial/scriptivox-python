@@ -120,6 +120,7 @@ def error_from_response(status: int, text: str, headers: Mapping[str, str]) -> A
         retry_after=retry_after,
         error=error,
         headers=lower,
+        help_id=error.get("help_id") if error and isinstance(error.get("help_id"), str) else None,
     )
 
 

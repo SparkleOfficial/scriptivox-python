@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- `help_id` on every `APIError` and on `TranscriptionFailedError`: the stable id of the page that explains that exact error (`error.help_id`, e.g. `"api-key-invalid"`), next to `docs_url`, its address `https://www.scriptivox.com/errors/{help_id}`. One code can have several pages; branch on `code` and use `help_id` for more detail. `TranscriptionFailedError` also gains `docs_url`. Both are `None` when the answer has none.
+- Regenerated from the API document: `help_id` and `docs_url` on errors and on a failed job's `error`, YouTube among the sites whose links `transcribe()` takes, and the reasons a refused YouTube video gives in `error.reason` (`link_private`, `link_age_restricted`, `link_members_only`, `link_premium_only`, `live_stream`).
+
 ## 0.6.0
 
 - `waiting` on a job (`get()`, `list()`, and what `wait()`'s `on_poll` sees) while it waits for its turn or for a later try at a Google Drive link: `reason` (`account_drive_limit`, `account_download_limit`, `busy`, `drive_retry`; new values may come), `since` and `retry_at`, with `progress` saying why in a sentence. The status keeps its value. Typed as `TranscriptionWaiting`.

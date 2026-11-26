@@ -438,6 +438,22 @@ def test_wait_failed_raises(mock):
         mock.client().wait("w2")
     assert e.value.code == "URL_NOT_ACCESSIBLE" and e.value.transcription_id == "w2"
     assert "HTTP 403" in str(e.value)
+    assert e.value.help_id is None and e.value.docs_url is None
+
+
+def test_help_id(mock):
+    mock.reply(api_error(400, "URL_NOT_ACCESSIBLE", "This YouTube video is age-restricted, so its audio can't be fetched.",
+                         reason="link_age_restricted", help_id="social-post-unavailable",
+                         docs_url="https://www.scriptivox.com/errors/social-post-unavailable"))
+    with pytest.raises(UrlNotAccessibleError) as e:
+        mock.client().transcribe(url="https://www.youtube.com/watch?v=0000000000a")
+    assert e.value.help_id == "social-post-unavailable"
+    assert e.value.docs_url == "https://www.scriptivox.com/errors/social-post-unavailable"
+    mock.reply(job("w4", "failed", error={"code": "URL_NOT_ACCESSIBLE", "message": "The file is not shared.", "help_id": "drive-not-shared",
+                                          "docs_url": "https://www.scriptivox.com/errors/drive-not-shared"}))
+    with pytest.raises(TranscriptionFailedError) as f:
+        mock.client().wait("w4")
+    assert f.value.help_id == "drive-not-shared" and f.value.docs_url == "https://www.scriptivox.com/errors/drive-not-shared"
 
 
 def test_wait_timeout(mock):
